@@ -29,12 +29,12 @@ void setmeta(MusicMeta *mm, char **params)
     mm->id = atoi(params[0]);
     mm->release_year = atoi(params[1]);
     
-    strcpy(mm->title, params[2]);
-    strcpy(mm->interpreter, params[3]);
-    strcpy(mm->language, params[4]);
-    strcpy(mm->category, params[5]);
-    strcpy(mm->chorus, params[6]);
-    strcpy(mm->fpath, params[7]);
+    strcpy((char *) mm->title, params[2]);
+    strcpy((char *) mm->interpreter, params[3]);
+    strcpy((char *) mm->language, params[4]);
+    strcpy((char *) mm->category, params[5]);
+    strcpy((char *) mm->chorus, params[6]);
+    strcpy((char *) mm->fpath, params[7]);
 }
 
 void loadmusics(MusicLib *ml, CSV *db)

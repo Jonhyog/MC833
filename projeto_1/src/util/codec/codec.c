@@ -107,21 +107,28 @@ uint16_t* htonmm(MusicMeta mm, uint16_t size, uint16_t op, uint16_t filter)
         section_size[i] += 2;
 
         // string fields
+        printf("DEBUG: \n");
+        printf("\tSEC_SIZE: %d - NEXT: %ld\n", section_size[i], (BITPACK(strlen(((char *) mm.title)       + 1), 16)) / 2);
         ttoff = section_size[i];
-        section_size[i] += BITPACK(strlen(mm.title)       + 1, 16) / 2;
+        section_size[i] += (BITPACK(strlen((char *) mm.title)       + 1, 16)) / 2;
         
+        printf("\tSEC_SIZE: %d\n", section_size[i]);
         itoff = section_size[i];
-        section_size[i] += BITPACK(strlen(mm.interpreter) + 1, 16) / 2;
+        section_size[i] += (BITPACK(strlen((char *) mm.interpreter) + 1, 16)) / 2;
 
+        printf("\tSEC_SIZE: %d\n", section_size[i]);
         lgoff = section_size[i];
-        section_size[i] += BITPACK(strlen(mm.language)    + 1, 16) / 2;
+        section_size[i] += (BITPACK(strlen((char *) mm.language)    + 1, 16)) / 2;
 
+        printf("\tSEC_SIZE: %d\n", section_size[i]);
         ctoff = section_size[i];
-        section_size[i] += BITPACK(strlen(mm.category)    + 1, 16) / 2;
+        section_size[i] += (BITPACK(strlen((char *) mm.category)    + 1, 16)) / 2;
 
+        printf("\tSEC_SIZE: %d\n", section_size[i]);
         choff = section_size[i];
-        section_size[i] += BITPACK(strlen(mm.chorus)      + 1, 16) / 2;
+        section_size[i] += (BITPACK(strlen((char *) mm.chorus)      + 1, 16)) / 2;
 
+        printf("\tSEC_SIZE: %d\n", section_size[i]);
         // writes section offsets
         offsets[offset_idx + 0] = secoff;
         offsets[offset_idx + 1] = idoff;
@@ -152,35 +159,35 @@ uint16_t* htonmm(MusicMeta mm, uint16_t size, uint16_t op, uint16_t filter)
         // }
 
         int idx = 0;
-        for (int j = 0; j < strlen(mm.title); j += 2) {
+        for (int j = 0; j < strlen((char *) mm.title); j += 2) {
             // FIX-ME: Segmentation Fault if strlen is odd
             data[i][ttoff + idx] = mm.title[j] | mm.title[j + 1] << 8;
             idx += 1;
         }
 
         idx = 0;
-        for (int j = 0; j < strlen(mm.interpreter); j += 2) {
+        for (int j = 0; j < strlen((char *) mm.interpreter); j += 2) {
             // FIX-ME: Segmentation Fault if strlen is odd
             data[i][itoff + idx] = mm.interpreter[j] | mm.interpreter[j + 1] << 8;
             idx += 1;
         }
 
         idx = 0;
-        for (int j = 0; j < strlen(mm.language); j += 2) {
+        for (int j = 0; j < strlen((char *) mm.language); j += 2) {
             // FIX-ME: Segmentation Fault if strlen is odd
             data[i][lgoff + idx] = mm.language[j] | mm.language[j + 1] << 8;
             idx += 1;
         }
 
         idx = 0;
-        for (int j = 0; j < strlen(mm.category); j += 2) {
+        for (int j = 0; j < strlen((char *) mm.category); j += 2) {
             // FIX-ME: Segmentation Fault if strlen is odd
             data[i][ctoff + idx] = mm.category[j] | mm.category[j + 1] << 8;
             idx += 1;
         }
 
         idx = 0;
-        for (int j = 0; j < strlen(mm.chorus); j += 2) {
+        for (int j = 0; j < strlen((char *) mm.chorus); j += 2) {
             // FIX-ME: Segmentation Fault if strlen is odd
             data[i][choff + idx] = mm.chorus[j] | mm.chorus[j + 1] << 8;
             idx += 1;
@@ -206,6 +213,7 @@ uint16_t* htonmm(MusicMeta mm, uint16_t size, uint16_t op, uint16_t filter)
         }
     }
 
+    printf("%d\n", pkt_idx);
     // FIX-ME: transform to network endianess
 
     return pkt;

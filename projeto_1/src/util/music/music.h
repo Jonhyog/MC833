@@ -8,12 +8,12 @@
 typedef struct {
     int  id;
     int  release_year;
-    char title[MAX_FIELD_SIZE];
-    char interpreter[MAX_FIELD_SIZE];
-    char language[MAX_FIELD_SIZE];
-    char category[MAX_FIELD_SIZE];
-    char chorus[MAX_FIELD_SIZE];
-    char fpath[MAX_FIELD_SIZE];
+    unsigned char title[MAX_FIELD_SIZE];
+    unsigned char interpreter[MAX_FIELD_SIZE];
+    unsigned char language[MAX_FIELD_SIZE];
+    unsigned char category[MAX_FIELD_SIZE];
+    unsigned char chorus[MAX_FIELD_SIZE];
+    unsigned char fpath[MAX_FIELD_SIZE];
 } MusicMeta;
 
 typedef struct {

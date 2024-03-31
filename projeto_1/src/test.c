@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
             ml->musics[i].meta.fpath
         );
 
-        int size = 135;
+        int size = 76;
         uint16_t *data = htonmm(ml->musics[i].meta, 1, MUSIC_GET, 0);
 
         FILE *write_ptr;
