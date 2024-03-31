@@ -1,6 +1,3 @@
-#ifndef MUSIC_H_INCLUDED__
-#define MUSIC_H_INCLUDED__
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -51,5 +48,3 @@ void loadmusics(MusicLib *ml, CSV *db)
         setmeta(&ml->musics[i].meta, db->data[i]);
     }
 }
-
-#endif

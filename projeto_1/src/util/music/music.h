@@ -1,3 +1,6 @@
+#ifndef MUSIC_H_INCLUDED__
+#define MUSIC_H_INCLUDED__
+
 #include "parser.h"
 
 #define MAX_FIELD_SIZE 128
@@ -28,3 +31,5 @@ MusicMeta* newmeta(char **params);
 MusicLib* newlib(int max_size);
 void setmeta(MusicMeta *mm, char **params);
 void loadmusics(MusicLib *md, CSV *db);
+
+#endif
