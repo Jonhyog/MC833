@@ -40,29 +40,42 @@ int main(int argc, char *argv[]) {
             ml->musics[i].meta.fpath
         );
 
-        int size = 76;
-        uint16_t *data = htonmm(ml->musics[i].meta, 1, MUSIC_GET, 0);
+        MMHints hints;
+
+        hints.pkt_filter = 0;
+        hints.pkt_op = MUSIC_GET;
+        hints.pkt_numres = 1;
+        hints.pkt_status = 0;
+
+        MusicMeta mm = ml->musics[i].meta;
+        uint16_t *data = htonmm(&mm, &hints);
 
         FILE *write_ptr;
 
         write_ptr = fopen("dump.bin", "wb");
-        fwrite(data, sizeof(uint16_t) * size, 1, write_ptr);
+        fwrite(data, sizeof(uint16_t) * hints.pkt_size, 1, write_ptr);
 
-        printf("h1: "); print_bin(data[0]);
-        printf("h2: "); print_bin(data[1]);
-        
-        for (int i = 0; i < 8 * 1; i++) {
-            printf("offset(%d): %d\t- 0b", i, data[2 + i]); print_bin(data[2 + i]);
-        }
+        MusicMeta *res = ntohmm(data, &hints);
 
-        printf("id: \t%d\n", data[10]);
-        printf("release_year: \t%d\n", data[11]);
+        printf("RES\n%d, %d, %s, %s, %s, %s, %s, %s\n",
+            res[0].id,
+            res[0].release_year,
+            res[0].title,
+            res[0].interpreter,
+            res[0].language,
+            res[0].category,
+            res[0].chorus,
+            res[0].fpath
+        );
 
-        printf("title: \t");
-        for (int i = 0; data[12 + i] != '\0'; i++)
-            printf("%c%c", (data[12 + i] << 8) >> 8, data[12 + i] >> 8);
-        printf("\n");
-        break;
+        printf("HINTS:\n\tSIZE:%d\n\tTYPE:%d\n\tOP:%d\n\tSTATUS:%d\n\tNUM_RES:%d\n\tFILTER:%d\n",
+            hints.pkt_size,
+            hints.pkt_type,
+            hints.pkt_op,
+            hints.pkt_status,
+            hints.pkt_numres,
+            hints.pkt_filter
+        );
     }
 
 }
