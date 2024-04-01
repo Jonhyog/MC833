@@ -3,10 +3,18 @@ WARN=-Wall -Werror
 CCFLAGS=$(WARN)
 INCLUDE_DIR=src/util/*
 
-all: test
+all: test client server
+
+server: src/server/server.c
+	$(CC) src/server/server.c -c -o bin/server/server.o -Isrc/util/parser/ -Isrc/util/music/ -Isrc/util/codec/ $(CCFLAGS)
+	$(CC) bin/music.o bin/parser.o bin/codec.o bin/server/server.o -o server.out $(CCFLAGS)
+
+client: src/client/client.c
+	$(CC) src/client/client.c -c -o bin/client/client.o -Isrc/util/parser/ -Isrc/util/music/ -Isrc/util/codec/ $(CCFLAGS)
+	$(CC) bin/music.o bin/parser.o bin/codec.o bin/client/client.o -o client.out $(CCFLAGS)
 
 test: src/test.c utils
-	$(CC) src/test.c -c -o bin/test.o -Isrc/util/parser/ -Isrc/util/music/  -Isrc/util/codec/ $(CCFLAGS)
+	$(CC) src/test.c -c -o bin/test.o -Isrc/util/parser/ -Isrc/util/music/ -Isrc/util/codec/ $(CCFLAGS)
 	$(CC) bin/music.o bin/parser.o bin/codec.o bin/test.o -o test.out $(CCFLAGS)
 
 utils: src/util/*
