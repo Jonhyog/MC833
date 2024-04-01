@@ -100,11 +100,12 @@ uint16_t* htonmm(MusicMeta *mm, MMHints *hints)
         for (int j = 3; j < 8; j++) write2int16(fields_offsets[j], fields_values[j], data[i]);
     }
     
+    hints->pkt_size = pkt_size * sizeof(uint16_t);
     uint16_t *pkt = calloc(pkt_size, sizeof(uint16_t));
     uint16_t pkt_idx = 3;
 
     // copies header
-    pkt[0] = htons(pkt_size);
+    pkt[0] = htons(hints->pkt_size);
     pkt[1] = htons(h1);
     pkt[2] = htons(h2);
 
