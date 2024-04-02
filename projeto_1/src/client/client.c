@@ -27,30 +27,6 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int sendall(int fd, uint16_t *buff, int *len)
-{
-    int total = 0;        // how many bytes we've sent
-    int bytesleft = *len;  // how many we have left to send
-    int n;
-
-    printf("seding data:\n");
-    while(total < *len) {
-        n = send(fd, buff + total, bytesleft, 0);
-        if (n == -1) { break; }
-        total += n;
-        bytesleft -= n;
-        printf("\t(%d/%d)\n", total, bytesleft);
-    }
-    printf("\t(%d/%d)\n", total, bytesleft);
-
-    *len = total; // return number actually sent here
-
-    printf("sent %d bytes!\n", total);
-
-    return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
-}
-
-
 int main(int argc, char *argv[])
 {
 	int sockfd;  
@@ -128,6 +104,20 @@ int main(int argc, char *argv[])
     write_ptr = fopen("client_dump.bin", "wb");
     fwrite(buff, meta_hints.pkt_size, 1, write_ptr);
 
+	printf("waiting response\n");
+
+	uint16_t response_buff[2048];
+
+	recvall(sockfd, response_buff, 2048, 0);
+
+	// MusicMeta *server_res;
+
+	ntohmm(response_buff, &meta_hints);
+
+	if (meta_hints.pkt_type == MUSIC_RES) {
+		printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+	}
+
 	for (int i = 0; i < 100000000; i++);
 
 	printf("sleeping for some time\n");
@@ -143,6 +133,15 @@ int main(int argc, char *argv[])
     len = (int) meta_hints.pkt_size;
     sendall(sockfd, buff, &len);
 
+	printf("waiting response\n");
+
+	recvall(sockfd, response_buff, 2048, 0);
+	ntohmm(response_buff, &meta_hints);
+	
+	if (meta_hints.pkt_type == MUSIC_RES) {
+		printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+	}
+
 	for (int i = 0; i < 100000000; i++);
 
 	printf("sleeping for some time\n");
@@ -157,6 +156,18 @@ int main(int argc, char *argv[])
 
     len = (int) meta_hints.pkt_size;
     sendall(sockfd, buff, &len);
+
+	printf("waiting response\n");
+
+	recvall(sockfd, response_buff, 2048, 0);
+
+	// MusicMeta *server_res;
+
+	ntohmm(response_buff, &meta_hints);
+
+	if (meta_hints.pkt_type == MUSIC_RES) {
+		printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+	}
 
 	close(sockfd);
 

@@ -187,3 +187,46 @@ MusicMeta* ntohmm(uint16_t* pkt, MMHints *hints)
 
     return mm;
 }
+
+void recvall(int fd, uint16_t *buff, int buff_size, int flags)
+{
+    int size = 0;
+    uint16_t pkt_size = -1;
+
+    while (1) {
+        if ((size += recv(fd, buff, buff_size - 1, flags)) == -1) {
+            perror("recv");
+            exit(1);
+	    }
+
+        if (size > 1 && pkt_size != -1) {
+            pkt_size = ntohs(buff[0]);
+            // printf("Expecting %d bytes\n", pkt_size);
+        }
+
+        if (size == pkt_size) {
+            break;
+        }
+
+        // FIX-ME: should timeout if receives something
+        // but takes too long (e.g. > 10s) to recv all pkt
+    }
+}
+
+int sendall(int fd, uint16_t *buff, int *len)
+{
+    int total = 0;        // how many bytes we've sent
+    int bytesleft = *len;  // how many we have left to send
+    int n;
+
+    while(total < *len) {
+        n = send(fd, buff + total, bytesleft, 0);
+        if (n == -1) { break; }
+        total += n;
+        bytesleft -= n;
+    }
+
+    *len = total; // return number actually sent here
+
+    return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
+}

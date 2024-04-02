@@ -43,33 +43,6 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void recvall(int fd, uint16_t *buff, int flags)
-{
-    int size = 0;
-    uint16_t pkt_size = -1;
-
-    while (1) {
-        if ((size += recv(fd, buff, BUFFER_SIZE - 1, 0)) == -1) {
-            perror("recv");
-            exit(1);
-	    }
-
-        if (size > 1 && pkt_size != -1) {
-            pkt_size = ntohs(buff[0]);
-            // printf("Expecting %d bytes\n", pkt_size);
-        }
-
-        if (size == pkt_size) {
-            break;
-        }
-
-        // FIX-ME: should timeout if receives something
-        // but takes too long (e.g. > 10s) to recv all pkt
-    }
-
-    printf("server: received %d bytes pkt\n", size);
-}
-
 void handle_add(MusicLib *db, MusicMeta *mm)
 {
 	// FIX-ME: db should decide choose id value
@@ -99,7 +72,10 @@ void handle_delete(MusicLib *db, MusicMeta *mm)
 		}
 	}
 
-	if (pos == - 1) printf("server: no music with id == %d \n/", mm->id);
+	if (pos == - 1) {
+		printf("server: no music with id == %d \n/", mm->id);
+		return;
+	}
 
 	for (int i = pos; i < db->size - 1; i++) {
 		db->musics[i] = db->musics[i + 1];
@@ -143,30 +119,52 @@ void service_loop(int fd, MusicLib *db)
     MusicMeta *mm;
     MMHints hints;
     uint16_t buff[BUFFER_SIZE];
+	uint16_t *resbuff;
+	MusicMeta *res;
+	MusicData *temp;
+	int len, numres;
     
     while (1) {
         // gets all data
-        recvall(fd, buff, 0);
+        recvall(fd, buff, BUFFER_SIZE, 0);
 
         // unpacks data
         memset(&hints, 0, sizeof(MMHints));
         mm = ntohmm(buff, &hints);
 
-        if (hints.pkt_op == MUSIC_ADD) {
-            handle_add(db, mm);
+		// handles operations
+		switch (hints.pkt_op)
+		{
+		case MUSIC_ADD:
+			temp = (MusicData *) malloc(sizeof(MusicData));
+			meta_copy(&temp->meta, mm);
+			add_music(db, temp);
+			free(temp);
 
-            FILE *write_ptr;
-            write_ptr = fopen("server_dump.bin", "wb");
-            fwrite(buff, hints.pkt_size, 1, write_ptr);
-        }
+			// sets response hints
+			hints.pkt_type = MUSIC_RES;
+			hints.pkt_status = MUSIC_OK;
+			hints.pkt_numres = 0;
+			res = NULL;
 
-		if (hints.pkt_op == MUSIC_DEL) {
-            handle_delete(db, mm);
-        }
+            // FILE *write_ptr;
+            // write_ptr = fopen("server_dump.bin", "wb");
+            // fwrite(buff, hints.pkt_size, 1, write_ptr);
 
-		if (hints.pkt_op == MUSIC_LIST) {
-			uint16_t numres = 0;
-            MusicMeta *res = handle_list(db, mm, hints, &numres);
+			break;
+		case MUSIC_DEL:
+			rmv_music(db, mm->id);
+
+			// sets response hints
+			hints.pkt_type = MUSIC_RES;
+			hints.pkt_status = MUSIC_OK;
+			hints.pkt_numres = 0;
+			res = NULL;
+
+			break;
+		case MUSIC_LIST:
+			numres = 0;
+            res = get_meta(db, mm, (int) hints.pkt_filter, &numres);
 
 			printf("server: listing musics with matching meta fields\n");
 			for (int i = 0; i < db->size; i++) {
@@ -183,8 +181,23 @@ void service_loop(int fd, MusicLib *db)
 			}
 			printf("server: stopped listing\n");
 
-			free(res);
-        }
+			// sets response hints
+			hints.pkt_type = MUSIC_RES;
+			hints.pkt_status = MUSIC_OK;
+			hints.pkt_numres = numres;
+
+			break;
+		default:
+			break;
+		}
+
+		// responds to client
+		resbuff = htonmm(res, &hints);
+		len = (int) hints.pkt_size;
+		printf("server: responding op %d with %d bytes\n", hints.pkt_op, hints.pkt_size);
+		sendall(fd, resbuff, &len);
+
+		if (res != NULL) free(res);
 
 		if (db->size == 0) {
 			printf("server: no data...\n");

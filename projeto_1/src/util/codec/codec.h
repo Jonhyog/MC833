@@ -7,10 +7,19 @@
 
 #define HEADER_SIZE 12
 
+// pkt_ops
 #define MUSIC_ADD  0b00
 #define MUSIC_DEL  0b01
 #define MUSIC_LIST 0b10
 #define MUSIC_GET  0b11
+
+// pkt_types
+#define MUSIC_OPS  0b00
+#define MUSIC_RES  0b11
+
+// pkt_status
+#define MUSIC_OK   0b00
+#define MUSIC_ERR  0b01
 
 // pkt_size     : 16 bits
 
@@ -48,5 +57,7 @@ uint16_t* htonmm(MusicMeta *mm, MMHints *hints);
 MusicMeta* ntohmm(uint16_t* pkt, MMHints *hints);
 // MusicMeta* ntohmd(unsigned char* pkt);
 
+void recvall(int fd, uint16_t *buff, int buff_size, int flags);
+int  sendall(int fd, uint16_t *buff, int *len);
 
 #endif

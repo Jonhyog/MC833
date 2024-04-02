@@ -18,12 +18,14 @@ typedef struct {
 
 typedef struct {
     MusicMeta meta;
+    int data_size;
     unsigned char *data;
 } MusicData;
 
 typedef struct {
     int max_size;
     int size;
+    int next_id;
     MusicData *musics;
 } MusicLib;
 
@@ -31,5 +33,12 @@ MusicMeta* newmeta(char **params);
 MusicLib* newlib(int max_size);
 void setmeta(MusicMeta *mm, char **params);
 void loadmusics(MusicLib *md, CSV *db);
+
+void meta_copy(MusicMeta *dest, MusicMeta *src);
+void msc_copy(MusicData *a, MusicData *b);
+
+void add_music(MusicLib *ml, MusicData *md);
+void rmv_music(MusicLib *ml, int id);
+MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size);
 
 #endif
