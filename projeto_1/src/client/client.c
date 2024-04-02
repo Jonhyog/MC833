@@ -128,6 +128,36 @@ int main(int argc, char *argv[])
     write_ptr = fopen("client_dump.bin", "wb");
     fwrite(buff, meta_hints.pkt_size, 1, write_ptr);
 
+	for (int i = 0; i < 100000000; i++);
+
+	printf("sleeping for some time\n");
+	meta_hints.pkt_filter = 0b10;
+    meta_hints.pkt_op = MUSIC_LIST;
+    meta_hints.pkt_numres = 1;
+    meta_hints.pkt_status = 0;
+
+	buff = htonmm(&meta, &meta_hints);
+
+    printf("META SIZE: %d\n", meta_hints.pkt_size);
+
+    len = (int) meta_hints.pkt_size;
+    sendall(sockfd, buff, &len);
+
+	for (int i = 0; i < 100000000; i++);
+
+	printf("sleeping for some time\n");
+	meta_hints.pkt_filter = 0;
+    meta_hints.pkt_op = MUSIC_DEL;
+    meta_hints.pkt_numres = 1;
+    meta_hints.pkt_status = 0;
+
+	buff = htonmm(&meta, &meta_hints);
+
+    printf("META SIZE: %d\n", meta_hints.pkt_size);
+
+    len = (int) meta_hints.pkt_size;
+    sendall(sockfd, buff, &len);
+
 	close(sockfd);
 
 	return 0;

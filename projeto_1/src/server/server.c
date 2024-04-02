@@ -72,6 +72,8 @@ void recvall(int fd, uint16_t *buff, int flags)
 
 void handle_add(MusicLib *db, MusicMeta *mm)
 {
+	// FIX-ME: db should decide choose id value
+
     MusicMeta *db_meta = &db->musics[db->size].meta;
 
     db_meta->id = mm->id;
@@ -84,6 +86,56 @@ void handle_add(MusicLib *db, MusicMeta *mm)
     strcpy((char *) db_meta->chorus, (char *) mm->chorus);
 
     db->size++;
+}
+
+void handle_delete(MusicLib *db, MusicMeta *mm)
+{
+	int pos = -1;
+
+	for (int i = 0; i < db->size; i++) {
+		if (db->musics[i].meta.id == mm->id) {
+			pos = i;
+			break;
+		}
+	}
+
+	if (pos == - 1) printf("server: no music with id == %d \n/", mm->id);
+
+	for (int i = pos; i < db->size - 1; i++) {
+		db->musics[i] = db->musics[i + 1];
+	}
+	db->size--;
+}
+
+MusicMeta * handle_list(MusicLib *db, MusicMeta *mm, MMHints hints, uint16_t *res_size)
+{
+	uint16_t filter = hints.pkt_filter;
+	MusicMeta *res = (MusicMeta *) calloc(db->size, sizeof(MusicMeta));
+
+	*res_size = 0;
+	for (int i = 0; i < db->size; i++) {
+		
+		if (((filter >> 0) & 1) && db->musics[i].meta.id != mm->id) continue;
+		if (((filter >> 1) & 1) && db->musics[i].meta.release_year != mm->release_year) continue;
+		if (((filter >> 2) & 1) && !strcmp((char *) db->musics[i].meta.title, (char *) mm->title)) continue;
+		if (((filter >> 3) & 1) && !strcmp((char *) db->musics[i].meta.interpreter, (char *) mm->interpreter)) continue;
+		if (((filter >> 4) & 1) && !strcmp((char *) db->musics[i].meta.language, (char *) mm->language)) continue;
+		if (((filter >> 5) & 1) && !strcmp((char *) db->musics[i].meta.category, (char *) mm->category)) continue;
+		if (((filter >> 6) & 1) && !strcmp((char *) db->musics[i].meta.chorus, (char *) mm->chorus)) continue;
+		
+		res[*res_size].id = db->musics[i].meta.id;
+    	res[*res_size].release_year = db->musics[i].meta.release_year;
+
+		strcpy((char *) res[*res_size].title, (char *) db->musics[i].meta.title);
+		strcpy((char *) res[*res_size].interpreter, (char *) db->musics[i].meta.interpreter);
+		strcpy((char *) res[*res_size].language, (char *) db->musics[i].meta.language);
+		strcpy((char *) res[*res_size].category, (char *) db->musics[i].meta.category);
+		strcpy((char *) res[*res_size].chorus, (char *) db->musics[i].meta.chorus);
+
+		*res_size += 1;
+	}
+
+	return res;
 }
 
 void service_loop(int fd, MusicLib *db)
@@ -106,9 +158,37 @@ void service_loop(int fd, MusicLib *db)
             FILE *write_ptr;
             write_ptr = fopen("server_dump.bin", "wb");
             fwrite(buff, hints.pkt_size, 1, write_ptr);
-            // printf("DEBUG: %s\n", mm->interpreter);
-            // exit(1);
         }
+
+		if (hints.pkt_op == MUSIC_DEL) {
+            handle_delete(db, mm);
+        }
+
+		if (hints.pkt_op == MUSIC_LIST) {
+			uint16_t numres = 0;
+            MusicMeta *res = handle_list(db, mm, hints, &numres);
+
+			printf("server: listing musics with matching meta fields\n");
+			for (int i = 0; i < db->size; i++) {
+				printf("%d, %d, %s, %s, %s, %s, %s, %s\n",
+					res[i].id,
+					res[i].release_year,
+					res[i].title,
+					res[i].interpreter,
+					res[i].language,
+					res[i].category,
+					res[i].chorus,
+					res[i].fpath
+				);
+			}
+			printf("server: stopped listing\n");
+
+			free(res);
+        }
+
+		if (db->size == 0) {
+			printf("server: no data...\n");
+		}
 
         for (int i = 0; i < db->size; i++) {
             printf("%d, %d, %s, %s, %s, %s, %s, %s\n",
