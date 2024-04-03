@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 	int rv;
 	char s[INET6_ADDRSTRLEN];
 
-	if (argc != 2) {
+	if (argc < 2) {
 	    fprintf(stderr,"usage: client hostname\n");
 	    exit(1);
 	}
@@ -85,22 +85,21 @@ int main(int argc, char *argv[])
 	// char entrada[2048];
 	int len;
 
-// add x
-// rem x
-// list year=x
-// list lang=x
-// list type=x
-// list id=x
-// list
-
 	while (meta_hints.pkt_type != MUSIC_END){
-		printf("choose operation (add, rem, list): ");
+		if(argc>2 && strcmp(argv[2], "-adm")==0){
+			printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
+			printf("Digite a operação:");
+		}
+		else{
+			printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
+			printf("Digite a operação:");
+		}
 		scanf(" %s", op);
 		fgets(clear_line, 128, stdin);
 		printf("%s\n", op);
 		// op = strtok(entrada, " ");
 
-		if(strcmp(op, "add") == 0){
+		if(strcmp(op, "add") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
 			meta.id = 0; // placeholder - true id decided by server
 
 			//add musica
@@ -147,7 +146,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if(strcmp(op, "rem") == 0){
+		 else if(strcmp(op, "rem") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
 			printf("\n ID: ");
 			scanf(" %d", &meta.id);
 
@@ -172,8 +171,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		//tok vai ser do tipo id=x lan=y
-		if(strcmp(op, "list") == 0){
+		else if(strcmp(op, "list") == 0){
 			char fields[2048];
 			fgets((char *) fields, 2048, stdin);
 
@@ -184,6 +182,7 @@ int main(int argc, char *argv[])
 			char **tokens = (char **) malloc(sizeof(char *) * 8);
 
 			for (char *tok = strtok(fields, ";"); tok && *tok; tok = strtok(NULL, ";\n")) {
+				printf("tok:%s", tok);
 				tokens[counter] = malloc(sizeof(char) * 128);
 				strcpy(tokens[counter], tok);
 				counter++;
@@ -263,6 +262,17 @@ int main(int argc, char *argv[])
             		);
 				}
 			}
+		}
+		else if(strcmp(op, "exit") == 0){
+			char confirm[3];
+			printf("Deseja sair? (y/n)");
+			scanf("%s", confirm);
+			if(strcmp(confirm, "y")==0){
+				meta_hints.pkt_type = MUSIC_END;
+			}
+		}
+		else{
+			printf("Operação não suportada ou reservada para administradores, tente novamente\n");
 		}
 	}
 
