@@ -80,96 +80,153 @@ int main(int argc, char *argv[])
     MMHints  meta_hints;
     uint16_t *buff;
 
-    meta.id = 1;
-    meta.release_year = 1723;
-    strcpy((char *) meta.title, "As Quatro Estações (Le Quattro Stagioni)");
-    strcpy((char *) meta.interpreter, "Antônio Vivaldi");
-    strcpy((char *) meta.language, "Italiano");
-    strcpy((char *) meta.category, "Clássica");
-    strcpy((char *) meta.chorus, "N/A");
+// add x
+// rem x
+// list year=x
+// list lang=x
+// list type=x
+// list id=x
+// list
 
-    meta_hints.pkt_filter = 0;
-    meta_hints.pkt_op = MUSIC_ADD;
-    meta_hints.pkt_numres = 1;
-    meta_hints.pkt_status = 0;
+	while(meta_hints.pkt_type != EXIT){
+		char *entrada;
+		scanf("%s", entrada);
 
-    buff = htonmm(&meta, &meta_hints);
+		op = strtok(entrada, " ");
+		if(strcmp(op, "add") == 0){
+			meta.id = strtok(NULL, " ");
+			//add musica
+			printf("\n Título: ");
+			scanf("%s", meta.title);
+			printf("\n Intérprete: ");
+			scanf("%s", meta.interpreter);
+			printf("\n Idioma: ");
+			scanf("%s", meta.language);
+			printf("\n Tipo de música: ");
+			scanf("%s", meta.category);
+			printf("\n Refrão: ");
+			scanf("%s", meta.chorus);
+			printf("\n Ano de Lançamento: ");
+			scanf("%s", meta.release_year);
 
-    printf("META SIZE: %d\n", meta_hints.pkt_size);
+			meta_hints.pkt_filter = 0;
+    		meta_hints.pkt_op = MUSIC_ADD;
+    		meta_hints.pkt_numres = 1;
+    		meta_hints.pkt_status = 0;
+			buff = htonmm(&meta, &meta_hints);
 
-    int len = (int) meta_hints.pkt_size;
-    sendall(sockfd, buff, &len);
+    		printf("META SIZE: %d\n", meta_hints.pkt_size);
+
+    		int len = (int) meta_hints.pkt_size;
+    		sendall(sockfd, buff, &len);
     
-    FILE *write_ptr;
-    write_ptr = fopen("client_dump.bin", "wb");
-    fwrite(buff, meta_hints.pkt_size, 1, write_ptr);
+    		FILE *write_ptr;
+    		write_ptr = fopen("client_dump.bin", "wb");
+    		fwrite(buff, meta_hints.pkt_size, 1, write_ptr);
 
-	printf("waiting response\n");
+			printf("waiting response\n");
 
-	uint16_t response_buff[2048];
+			uint16_t response_buff[2048];
 
-	recvall(sockfd, response_buff, 2048, 0);
+			recvall(sockfd, response_buff, 2048, 0);
 
-	// MusicMeta *server_res;
+			// MusicMeta *server_res;
 
-	ntohmm(response_buff, &meta_hints);
+			ntohmm(response_buff, &meta_hints);
 
-	if (meta_hints.pkt_type == MUSIC_RES) {
-		printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-	}
+			if (meta_hints.pkt_type == MUSIC_RES) {
+				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+			}
+		}
 
-	for (int i = 0; i < 100000000; i++);
+		if(strcmp(op, "rem") == 0){
+			meta.id = strtok(NULL, " ");
+			meta_hints.pkt_filter = 0;
+    		meta_hints.pkt_op = MUSIC_DEL;
+    		meta_hints.pkt_numres = 1;
+    		meta_hints.pkt_status = 0;
 
-	printf("sleeping for some time\n");
-	meta_hints.pkt_filter = 0b10;
-    meta_hints.pkt_op = MUSIC_LIST;
-    meta_hints.pkt_numres = 1;
-    meta_hints.pkt_status = 0;
+			buff = htonmm(&meta, &meta_hints);
 
-	buff = htonmm(&meta, &meta_hints);
+    		printf("META SIZE: %d\n", meta_hints.pkt_size);
 
-    printf("META SIZE: %d\n", meta_hints.pkt_size);
+    		len = (int) meta_hints.pkt_size;
+    		sendall(sockfd, buff, &len);
 
-    len = (int) meta_hints.pkt_size;
-    sendall(sockfd, buff, &len);
+			printf("waiting response\n");
 
-	printf("waiting response\n");
+			recvall(sockfd, response_buff, 2048, 0);
 
-	recvall(sockfd, response_buff, 2048, 0);
-	ntohmm(response_buff, &meta_hints);
+			// MusicMeta *server_res;
+
+			ntohmm(response_buff, &meta_hints);
+
+			if (meta_hints.pkt_type == MUSIC_RES) {
+				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+			}
+		}
+
+		//tok vai ser do tipo id=x lan=y
+		if(strcmp(op, "list") == 0){
+			char filter[8];
+			for (char *tok = strtok(entrada, " "); tok && *tok; tok = strtok(NULL, " ")) {
+
+				char *info = strtok(tok, "=");
+				if(strcmp(info,"id")){
+					meta.id = strtok(NULL, "=");
+					filter[8] = '1';
+				}
+				if(strcmp(info,"year")){
+					meta.release_year = strtok(NULL, "=");
+					filter[7] = '1';
+				}
+				if(strcmp(info,"title")){
+					strcpy(meta.title, strtok(NULL, "="));
+					filter[6] = '1';
+				}
+				if(strcmp(info,"interpreter")){
+					strcpy(meta.interpreter, strtok(NULL, "="));
+					filter[5] = '1';
+				}
+				if(strcmp(info,"lang")){
+					strcpy(meta.language, strtok(NULL, "="));
+					filter[4] = '1';
+				}
+				if(strcmp(info,"type")){
+					strcpy(meta.category, strtok(NULL, "="));
+					filter[3] = '1';
+				}
+				
+        	}
+			meta_hints.pkt_filter = strtoul (filter, NULL, 0);
+			meta_hints.pkt_op = MUSIC_LIST;
+    		meta_hints.pkt_numres = 1;
+    		meta_hints.pkt_status = 0;
+
+			buff = htonmm(&meta, &meta_hints);
+
+    		printf("META SIZE: %d\n", meta_hints.pkt_size);
+
+    		len = (int) meta_hints.pkt_size;
+    		sendall(sockfd, buff, &len);
+
+			printf("waiting response\n");
+
+			recvall(sockfd, response_buff, 2048, 0);
+			ntohmm(response_buff, &meta_hints);
 	
-	if (meta_hints.pkt_type == MUSIC_RES) {
-		printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+			if (meta_hints.pkt_type == MUSIC_RES) {
+				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+			}
+		}
 	}
-
-	for (int i = 0; i < 100000000; i++);
-
-	printf("sleeping for some time\n");
-	meta_hints.pkt_filter = 0;
-    meta_hints.pkt_op = MUSIC_DEL;
-    meta_hints.pkt_numres = 1;
-    meta_hints.pkt_status = 0;
-
-	buff = htonmm(&meta, &meta_hints);
-
-    printf("META SIZE: %d\n", meta_hints.pkt_size);
-
-    len = (int) meta_hints.pkt_size;
-    sendall(sockfd, buff, &len);
-
-	printf("waiting response\n");
-
-	recvall(sockfd, response_buff, 2048, 0);
-
-	// MusicMeta *server_res;
-
-	ntohmm(response_buff, &meta_hints);
-
-	if (meta_hints.pkt_type == MUSIC_RES) {
-		printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-	}
-
 	close(sockfd);
 
 	return 0;
+
+
+
+	
+
+	
 }
