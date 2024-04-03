@@ -167,7 +167,7 @@ void service_loop(int fd, MusicLib *db)
             res = get_meta(db, mm, (int) hints.pkt_filter, &numres);
 
 			printf("server: listing musics with matching meta fields\n");
-			for (int i = 0; i < db->size; i++) {
+			for (int i = 0; i < numres; i++) {
 				printf("%d, %d, %s, %s, %s, %s, %s, %s\n",
 					res[i].id,
 					res[i].release_year,

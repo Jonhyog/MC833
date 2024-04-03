@@ -93,8 +93,8 @@ uint16_t* htonmm(MusicMeta *mm, MMHints *hints)
         data[i] = calloc(section_size[i], sizeof(uint16_t));
 
         // writes interger fields
-        data[i][fields_offsets[1]] = mm[0].id;
-        data[i][fields_offsets[2]] = mm[0].release_year;
+        data[i][fields_offsets[1]] = mm[i].id;
+        data[i][fields_offsets[2]] = mm[i].release_year;
 
         // writes string fields
         for (int j = 3; j < 8; j++) write2int16(fields_offsets[j], fields_values[j], data[i]);

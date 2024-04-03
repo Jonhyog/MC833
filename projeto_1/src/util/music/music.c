@@ -102,7 +102,7 @@ void rmv_music(MusicLib *ml, int id)
 
 int compare_field(MusicMeta *a, MusicMeta *b, int filter)
 {
-    int res = 0;
+    int res = 1;
 
     switch (filter)
     {
@@ -113,19 +113,19 @@ int compare_field(MusicMeta *a, MusicMeta *b, int filter)
         res = (a->release_year != b->release_year);
         break;
     case (0b1 << 2):
-        res = !(strcmp((char *) a->title, (char *) b->title));
+        res = strcmp((char *) a->title, (char *) b->title);
         break;
     case (0b1 << 3):
-        res = !(strcmp((char *) a->interpreter, (char *) b->interpreter));
+        res = strcmp((char *) a->interpreter, (char *) b->interpreter);
         break;
     case (0b1 << 4):
-        res = !(strcmp((char *) a->language, (char *) b->title));
+        res = strcmp((char *) a->language, (char *) b->language);
         break;
     case (0b1 << 5):
-        res = !(strcmp((char *) a->category, (char *) b->title));
+        res = strcmp((char *) a->category, (char *) b->category);
         break;
     case (0b1 << 6):
-        res = !(strcmp((char *) a->chorus, (char *) b->title));
+        res = strcmp((char *) a->chorus, (char *) b->chorus);
         break;
     default:
         // FIX-ME: should set errno because filter is invalid
@@ -142,14 +142,27 @@ MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size)
 	*res_size = 0;
 	for (int i = 0; i < ml->size; i++) {
 
+        int found = 1;
         for (int j = 0; j < 7; j++) {
-            if (compare_field(&ml->musics[i].meta, mm, filter & (0b1 << i))) continue;
+            int filter_j = filter & (0b1 << j);
+            // not filtering by j-eth field
 
+            if (filter_j == 0) continue;
+
+            // compares j-eth field
+            if (compare_field(&ml->musics[i].meta, mm, filter_j) != 0) {
+                found = 0;
+                break;
+            }
+        }
+
+        if (found) {
             meta_copy(&res[*res_size], &ml->musics[i].meta);
+            printf("id check: %d x %d\n", res[*res_size].id, ml->musics[i].meta.id);
 		    *res_size += 1;
-            break;
         }
 	}
 
+    printf("server: found %d musics with matching fields\n", *res_size);
 	return res;
 }

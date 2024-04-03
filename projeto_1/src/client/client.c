@@ -79,6 +79,11 @@ int main(int argc, char *argv[])
     MusicMeta meta;
     MMHints  meta_hints;
     uint16_t *buff;
+	uint16_t response_buff[2048];
+	char op[10];
+	char clear_line[128];
+	// char entrada[2048];
+	int len;
 
 // add x
 // rem x
@@ -88,26 +93,39 @@ int main(int argc, char *argv[])
 // list id=x
 // list
 
-	while(meta_hints.pkt_type != EXIT){
-		char *entrada;
-		scanf("%s", entrada);
+	while (meta_hints.pkt_type != MUSIC_END){
+		printf("choose operation (add, rem, list): ");
+		scanf(" %s", op);
+		fgets(clear_line, 128, stdin);
+		printf("%s\n", op);
+		// op = strtok(entrada, " ");
 
-		op = strtok(entrada, " ");
 		if(strcmp(op, "add") == 0){
-			meta.id = strtok(NULL, " ");
+			meta.id = 0; // placeholder - true id decided by server
+
 			//add musica
 			printf("\n Título: ");
-			scanf("%s", meta.title);
+			fgets((char *) &meta.title, 128, stdin);
+			meta.title[strcspn((char *) meta.title, "\n")] = 0;
+
 			printf("\n Intérprete: ");
-			scanf("%s", meta.interpreter);
+			fgets((char *) &meta.interpreter, 128, stdin);
+			meta.interpreter[strcspn((char *) meta.interpreter, "\n")] = 0;
+
 			printf("\n Idioma: ");
-			scanf("%s", meta.language);
+			fgets((char *) &meta.language, 128, stdin);
+			meta.language[strcspn((char *) meta.language, "\n")] = 0;
+
 			printf("\n Tipo de música: ");
-			scanf("%s", meta.category);
+			fgets((char *) &meta.category, 128, stdin);
+			meta.category[strcspn((char *) meta.category, "\n")] = 0;
+
 			printf("\n Refrão: ");
-			scanf("%s", meta.chorus);
+			fgets((char *) &meta.chorus, 128, stdin);
+			meta.chorus[strcspn((char *) meta.chorus, "\n")] = 0;
+
 			printf("\n Ano de Lançamento: ");
-			scanf("%s", meta.release_year);
+			scanf(" %d", &meta.release_year);
 
 			meta_hints.pkt_filter = 0;
     		meta_hints.pkt_op = MUSIC_ADD;
@@ -117,21 +135,11 @@ int main(int argc, char *argv[])
 
     		printf("META SIZE: %d\n", meta_hints.pkt_size);
 
-    		int len = (int) meta_hints.pkt_size;
+    		len = (int) meta_hints.pkt_size;
     		sendall(sockfd, buff, &len);
     
-    		FILE *write_ptr;
-    		write_ptr = fopen("client_dump.bin", "wb");
-    		fwrite(buff, meta_hints.pkt_size, 1, write_ptr);
-
 			printf("waiting response\n");
-
-			uint16_t response_buff[2048];
-
 			recvall(sockfd, response_buff, 2048, 0);
-
-			// MusicMeta *server_res;
-
 			ntohmm(response_buff, &meta_hints);
 
 			if (meta_hints.pkt_type == MUSIC_RES) {
@@ -140,7 +148,9 @@ int main(int argc, char *argv[])
 		}
 
 		if(strcmp(op, "rem") == 0){
-			meta.id = strtok(NULL, " ");
+			printf("\n ID: ");
+			scanf(" %d", &meta.id);
+
 			meta_hints.pkt_filter = 0;
     		meta_hints.pkt_op = MUSIC_DEL;
     		meta_hints.pkt_numres = 1;
@@ -154,11 +164,7 @@ int main(int argc, char *argv[])
     		sendall(sockfd, buff, &len);
 
 			printf("waiting response\n");
-
 			recvall(sockfd, response_buff, 2048, 0);
-
-			// MusicMeta *server_res;
-
 			ntohmm(response_buff, &meta_hints);
 
 			if (meta_hints.pkt_type == MUSIC_RES) {
@@ -168,37 +174,64 @@ int main(int argc, char *argv[])
 
 		//tok vai ser do tipo id=x lan=y
 		if(strcmp(op, "list") == 0){
-			char filter[8];
-			for (char *tok = strtok(entrada, " "); tok && *tok; tok = strtok(NULL, " ")) {
+			char fields[2048];
+			fgets((char *) fields, 2048, stdin);
 
-				char *info = strtok(tok, "=");
-				if(strcmp(info,"id")){
-					meta.id = strtok(NULL, "=");
-					filter[8] = '1';
+			// char filter[8];
+			MusicMeta *server_res;
+			uint16_t filter = 0;
+			int counter = 0;
+			char **tokens = (char **) malloc(sizeof(char *) * 8);
+
+			for (char *tok = strtok(fields, ";"); tok && *tok; tok = strtok(NULL, ";\n")) {
+				tokens[counter] = malloc(sizeof(char) * 128);
+				strcpy(tokens[counter], tok);
+				counter++;
+			}
+
+			for (int i = 0; i < counter; i++) {
+				char *info = strtok(tokens[i], "=");
+				if(strcmp(info, "id") == 0){
+					meta.id = atoi(strtok(NULL, "=\n"));
+					filter |= (1 << 0);
+					// filter[8] = '1';
 				}
-				if(strcmp(info,"year")){
-					meta.release_year = strtok(NULL, "=");
-					filter[7] = '1';
+				if(strcmp(info, "year") == 0){
+					meta.release_year = atoi(strtok(NULL, "=\n"));
+					filter |= (1 << 1);
+					// filter[7] = '1';
 				}
-				if(strcmp(info,"title")){
-					strcpy(meta.title, strtok(NULL, "="));
-					filter[6] = '1';
+				if(strcmp(info, "title") == 0){
+					strcpy((char *) meta.title, strtok(NULL, "=\n"));
+					filter |= (1 << 2);
+					// filter[6] = '1';
 				}
-				if(strcmp(info,"interpreter")){
-					strcpy(meta.interpreter, strtok(NULL, "="));
-					filter[5] = '1';
+				if(strcmp(info, "interpreter") == 0){
+					strcpy((char *) meta.interpreter, strtok(NULL, "=\n"));
+					filter |= (1 << 3);
+					// filter[5] = '1';
 				}
-				if(strcmp(info,"lang")){
-					strcpy(meta.language, strtok(NULL, "="));
-					filter[4] = '1';
+				if(strcmp(info, "lang") == 0){
+					strcpy((char *) meta.language, strtok(NULL, "=\n"));
+					filter |= (1 << 4);
+					// filter[4] = '1';
 				}
-				if(strcmp(info,"type")){
-					strcpy(meta.category, strtok(NULL, "="));
-					filter[3] = '1';
+				if(strcmp(info, "type") == 0){
+					strcpy((char *) meta.category, strtok(NULL, "=\n"));
+					filter |= (1 << 5);
+					// filter[3] = '1';
+				}
+				if(strcmp(info, "chorus") == 0){
+					strcpy((char *) meta.chorus, strtok(NULL, "=\n"));
+					filter |= (1 << 6);
+					// filter[3] = '1';
 				}
 				
         	}
-			meta_hints.pkt_filter = strtoul (filter, NULL, 0);
+
+			printf("searching with filter %d\n", filter);
+			// meta_hints.pkt_filter = strtoul (filter, NULL, 0);
+			meta_hints.pkt_filter = filter;
 			meta_hints.pkt_op = MUSIC_LIST;
     		meta_hints.pkt_numres = 1;
     		meta_hints.pkt_status = 0;
@@ -208,18 +241,31 @@ int main(int argc, char *argv[])
     		printf("META SIZE: %d\n", meta_hints.pkt_size);
 
     		len = (int) meta_hints.pkt_size;
+
     		sendall(sockfd, buff, &len);
-
 			printf("waiting response\n");
-
 			recvall(sockfd, response_buff, 2048, 0);
-			ntohmm(response_buff, &meta_hints);
+			server_res = ntohmm(response_buff, &meta_hints);
 	
 			if (meta_hints.pkt_type == MUSIC_RES) {
 				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+				printf("listing musics with matching fields\n");
+
+				for (int i = 0; i < meta_hints.pkt_numres; i++) {
+					printf("\t%d, %d, %s, %s, %s, %s, %s\n",
+						server_res[i].id,
+						server_res[i].release_year,
+						server_res[i].title,
+						server_res[i].interpreter,
+						server_res[i].language,
+						server_res[i].category,
+						server_res[i].chorus
+            		);
+				}
 			}
 		}
 	}
+
 	close(sockfd);
 
 	return 0;

@@ -16,6 +16,7 @@
 // pkt_types
 #define MUSIC_OPS  0b00
 #define MUSIC_RES  0b11
+#define MUSIC_END  0b10
 
 // pkt_status
 #define MUSIC_OK   0b00
