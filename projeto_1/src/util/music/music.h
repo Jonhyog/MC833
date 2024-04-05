@@ -33,6 +33,7 @@ MusicMeta* newmeta(char **params);
 MusicLib* newlib(int max_size);
 void setmeta(MusicMeta *mm, char **params);
 void loadmusics(MusicLib *md, CSV *db);
+void savemusics(MusicLib *ml, CSV *db);
 
 void meta_copy(MusicMeta *dest, MusicMeta *src);
 void msc_copy(MusicData *a, MusicData *b);

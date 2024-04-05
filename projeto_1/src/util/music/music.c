@@ -50,6 +50,26 @@ void loadmusics(MusicLib *ml, CSV *db)
     }
 }
 
+void savemusics(MusicLib *ml, CSV *db)
+{
+    // updates db size
+    db->lines = ml->size;
+    db->collumns = 8;
+
+    // copies data to db
+    for (int i = 0; i < db->lines; i++) {
+        sprintf(db->data[i][0], "%d", ml->musics[i].meta.id);
+        sprintf(db->data[i][1], "%d", ml->musics[i].meta.release_year);
+        strcpy(db->data[i][2], (char *) ml->musics[i].meta.title);
+        strcpy(db->data[i][3], (char *) ml->musics[i].meta.interpreter);
+        strcpy(db->data[i][4], (char *) ml->musics[i].meta.language);
+        strcpy(db->data[i][5], (char *) ml->musics[i].meta.category);
+        strcpy(db->data[i][6], (char *) ml->musics[i].meta.chorus);
+        // strcpy(db->data[i][7], ""); // placeholder for fpath
+    }
+    
+}
+
 void meta_copy(MusicMeta *dest, MusicMeta *src)
 {   
     // integer fields

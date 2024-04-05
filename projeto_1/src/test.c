@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         MMHints hints;
 
         hints.pkt_filter = 0;
-        hints.pkt_op = MUSIC_GET;
+        // hints.pkt_op = MUSIC_GET;
         hints.pkt_numres = 1;
         hints.pkt_status = 0;
 

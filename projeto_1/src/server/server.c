@@ -21,6 +21,11 @@
 
 #define BUFFER_SIZE 2048
 
+MusicLib *db;
+FILE *stream;
+CSV *csv;
+char fpath[512];
+
 void sigchld_handler(int s)
 {
 	(void)s; // quiet unused variable warning
@@ -32,6 +37,23 @@ void sigchld_handler(int s)
 
 	errno = saved_errno;
 }
+
+// void int_handler(int sig)
+// {
+// 	char  c;
+
+// 	signal(sig, SIG_IGN);
+// 	printf("server: Deseja sair? (y/n)\n");
+// 	c = getchar();
+// 	if (c == 'y' || c == 'Y') {
+// 		savemusics(db, csv);
+// 		stream = fopen(fpath, "w");
+// 		savecsv(stream, csv, ";");
+// 		exit(0);
+// 	} else {
+// 		signal(SIGINT, int_handler);
+// 	}
+// }
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -123,6 +145,7 @@ void service_loop(int fd, MusicLib *db)
 	MusicMeta *res;
 	MusicData *temp;
 	int len, numres;
+	int end = 0;
     
     while (1) {
         // gets all data
@@ -187,6 +210,16 @@ void service_loop(int fd, MusicLib *db)
 			hints.pkt_numres = numres;
 
 			break;
+		case MUSIC_CLOSE:
+			// sets response hints
+			hints.pkt_type = MUSIC_END;
+			hints.pkt_status = MUSIC_OK;
+			hints.pkt_numres = 0;
+			res = NULL;
+
+			end = 1;
+
+			break;
 		default:
 			break;
 		}
@@ -201,6 +234,32 @@ void service_loop(int fd, MusicLib *db)
 
 		if (db->size == 0) {
 			printf("server: no data...\n");
+		}
+
+		if (end) {
+			struct sockaddr_in their_addr; // connector's address information
+			socklen_t sin_size;
+			char next_id[10];
+
+			// info
+			getpeername(fd, (struct sockaddr *) &their_addr, &sin_size);
+			printf("server: end conection with %s\n", inet_ntoa(their_addr.sin_addr));
+
+			// saves date before leaving
+			printf("server: saving data in %s\n", fpath);
+			savemusics(db, csv);
+			stream = fopen(fpath, "w");
+			savecsv(stream, csv, ";");
+
+			// saves db metadata
+			stream = fopen("music_lib.meta", "w");
+			sprintf(next_id, "%d\n", db->next_id);
+			fprintf(stream, next_id, "%s");
+
+			printf("server: save complete\n");
+
+			close(fd);
+			exit(0);
 		}
 
         for (int i = 0; i < db->size; i++) {
@@ -227,22 +286,31 @@ int main(int argc, char *argv[])
 	struct sigaction sa;
 	int yes=1;
 	char s[INET6_ADDRSTRLEN];
+	char next_id[10];
 	int rv;
 
     // FIX-ME: parsecsv and loadmusics should return pointer to csv and db
-    MusicLib *db = newlib(128);
-    FILE *stream;
-    CSV *csv = newcsv(128, 8);;
+    // MusicLib *db = newlib(128);
+    // FILE *stream;
+    // CSV *csv = newcsv(128, 8);
+    // db = newlib(128);
+    // csv = newcsv(128, 8);
 
     if (argc != 2) {
         fprintf(stderr, "usage: server musics.csv\n");
         exit(1);
     }
     
-    // loads musics data to memory
-    stream = fopen(argv[1], "r");
-    parsecsv(stream, csv, ";\n", 0);
-    loadmusics(db, csv);
+	// // loads db metadata
+	// stream = fopen("music_lib.meta", "r");
+	// fgets(next_id, 10, stream);
+	// db->next_id = atoi(next_id);
+	
+    // // loads musics data to memory
+    // stream = fopen(argv[1], "r");
+	// strcpy(fpath, argv[1]);
+    // parsecsv(stream, csv, ";\n", 0);
+    // loadmusics(db, csv);
 
     // starts up sockets
 	memset(&hints, 0, sizeof hints);
@@ -298,9 +366,11 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	printf("server: waiting for connections...\n");
+	// catches ctrl+c to safely exit
+	// signal(SIGINT, int_handler);
 
     // main accept() loop
+	printf("server: waiting for connections...\n");
 	while (1) {
 		sin_size = sizeof their_addr;
 		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
@@ -316,6 +386,21 @@ int main(int argc, char *argv[])
 
 		if (!fork()) {
 			close(sockfd);
+
+			db = newlib(128);
+    		csv = newcsv(128, 8);
+
+			// loads db metadata
+			stream = fopen("music_lib.meta", "r");
+			fgets(next_id, 10, stream);
+			db->next_id = atoi(next_id);
+			
+			// loads musics data to memory
+			stream = fopen(argv[1], "r");
+			strcpy(fpath, argv[1]);
+			parsecsv(stream, csv, ";\n", 0);
+			loadmusics(db, csv);
+
             service_loop(new_fd, db);
 			close(new_fd);
 			exit(0);

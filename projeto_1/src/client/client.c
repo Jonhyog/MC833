@@ -88,11 +88,11 @@ int main(int argc, char *argv[])
 	while (meta_hints.pkt_type != MUSIC_END){
 		if(argc>2 && strcmp(argv[2], "-adm")==0){
 			printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
-			printf("Digite a operação:");
+			printf("Digite a operação: ");
 		}
 		else{
 			printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
-			printf("Digite a operação:");
+			printf("Digite a operação: ");
 		}
 		scanf(" %s", op);
 		fgets(clear_line, 128, stdin);
@@ -265,10 +265,27 @@ int main(int argc, char *argv[])
 		}
 		else if(strcmp(op, "exit") == 0){
 			char confirm[3];
-			printf("Deseja sair? (y/n)");
+			printf("Deseja sair? (y/n): ");
 			scanf("%s", confirm);
-			if(strcmp(confirm, "y")==0){
+			if(strcmp(confirm, "y") == 0){
+				meta_hints.pkt_op = MUSIC_CLOSE;
+    			meta_hints.pkt_numres = 1;
+    			meta_hints.pkt_status = 0;
 				meta_hints.pkt_type = MUSIC_END;
+
+				buff = htonmm(&meta, &meta_hints);
+				printf("META SIZE: %d\n", meta_hints.pkt_size);
+				len = (int) meta_hints.pkt_size;
+				sendall(sockfd, buff, &len);
+
+				printf("waiting response\n");
+				recvall(sockfd, response_buff, 2048, 0);
+				ntohmm(response_buff, &meta_hints);
+				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+
+				if (meta_hints.pkt_status != MUSIC_OK) {
+					meta_hints.pkt_type = MUSIC_ADD; // will be overwritten in next iter
+				}
 			}
 		}
 		else{
