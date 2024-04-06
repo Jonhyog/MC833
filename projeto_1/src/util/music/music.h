@@ -39,7 +39,7 @@ void meta_copy(MusicMeta *dest, MusicMeta *src);
 void msc_copy(MusicData *a, MusicData *b);
 
 void add_music(MusicLib *ml, MusicData *md);
-void rmv_music(MusicLib *ml, int id);
+int rmv_music(MusicLib *ml, int id);
 MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size);
 
 #endif

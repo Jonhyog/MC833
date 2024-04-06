@@ -176,11 +176,15 @@ void service_loop(int fd, MusicLib *db)
 
 			break;
 		case MUSIC_DEL:
-			rmv_music(db, mm->id);
 
 			// sets response hints
 			hints.pkt_type = MUSIC_RES;
-			hints.pkt_status = MUSIC_OK;
+			if(rmv_music(db, mm->id) == 1){
+				hints.pkt_status = MUSIC_ERR;
+			}
+			else{
+				hints.pkt_status = MUSIC_OK;
+			}	
 			hints.pkt_numres = 0;
 			res = NULL;
 

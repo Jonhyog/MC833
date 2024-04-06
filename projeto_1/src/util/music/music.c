@@ -101,7 +101,7 @@ void add_music(MusicLib *ml, MusicData *md)
     ml->size++;
 }
 
-void rmv_music(MusicLib *ml, int id)
+int rmv_music(MusicLib *ml, int id)
 {
     int pos = -1;
 
@@ -113,11 +113,12 @@ void rmv_music(MusicLib *ml, int id)
 	}
 
     // FIX-ME: should set a error
-	if (pos == - 1) return;
+	if (pos == - 1) return 1;
 
 	for (int i = pos; i < ml->size - 1; i++)
         msc_copy(&ml->musics[i], &ml->musics[i + 1]);
 	ml->size--;
+    return 0;
 }
 
 int compare_field(MusicMeta *a, MusicMeta *b, int filter)

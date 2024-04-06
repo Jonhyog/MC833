@@ -82,7 +82,6 @@ int main(int argc, char *argv[])
 	uint16_t response_buff[2048];
 	char op[10];
 	char clear_line[128];
-	// char entrada[2048];
 	int len;
 
 	while (meta_hints.pkt_type != MUSIC_END){
@@ -97,7 +96,6 @@ int main(int argc, char *argv[])
 		scanf(" %s", op);
 		fgets(clear_line, 128, stdin);
 		printf("%s\n", op);
-		// op = strtok(entrada, " ");
 
 		if(strcmp(op, "add") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
 			meta.id = 0; // placeholder - true id decided by server
@@ -166,6 +164,10 @@ int main(int argc, char *argv[])
 			recvall(sockfd, response_buff, 2048, 0);
 			ntohmm(response_buff, &meta_hints);
 
+			if(meta_hints.pkt_status != MUSIC_OK){
+				printf("\nNenhuma música com este id\n");
+			}
+
 			if (meta_hints.pkt_type == MUSIC_RES) {
 				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
 			}
@@ -182,7 +184,6 @@ int main(int argc, char *argv[])
 			char **tokens = (char **) malloc(sizeof(char *) * 8);
 
 			for (char *tok = strtok(fields, ";"); tok && *tok; tok = strtok(NULL, ";\n")) {
-				printf("tok:%s", tok);
 				tokens[counter] = malloc(sizeof(char) * 128);
 				strcpy(tokens[counter], tok);
 				counter++;
@@ -249,6 +250,10 @@ int main(int argc, char *argv[])
 			if (meta_hints.pkt_type == MUSIC_RES) {
 				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
 				printf("listing musics with matching fields\n");
+
+				if(meta_hints.pkt_numres == 0){
+					printf("\nNenhuma música com essas carcterísticas encontrada!\n");
+				}
 
 				for (int i = 0; i < meta_hints.pkt_numres; i++) {
 					printf("\t%d, %d, %s, %s, %s, %s, %s\n",
