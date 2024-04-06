@@ -53,16 +53,17 @@ void parsecsv(FILE *stream, CSV *dest, char *sep, int skip_header)
             );
             collumns++;
         }
-        dest->lines++;
+        if (collumns != 0) dest->lines++;
     }
 }
 
 void savecsv(FILE *stream, CSV *csv, char *sep)
 {
-    char line[2048]; memset(line, 0, 2048);
+    char line[2048];
     int line_ptr;
 
     for (int i = 0; i < csv->lines; i++) {
+        memset(line, 0, 2048);
         line_ptr = 0;
         for (int j = 0; j < csv->collumns; j++) {
             for (int k = 0; k < strlen(csv->data[i][j]); k++) {
@@ -73,6 +74,7 @@ void savecsv(FILE *stream, CSV *csv, char *sep)
             line_ptr++;
         }
         line[line_ptr] = '\n';
+        line[line_ptr + 1] = '\0';
         fprintf(stream, line, "%s");
     }
 }
