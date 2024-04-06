@@ -179,11 +179,9 @@ MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size)
 
         if (found) {
             meta_copy(&res[*res_size], &ml->musics[i].meta);
-            printf("id check: %d x %d\n", res[*res_size].id, ml->musics[i].meta.id);
 		    *res_size += 1;
         }
 	}
 
-    printf("server: found %d musics with matching fields\n", *res_size);
 	return res;
 }

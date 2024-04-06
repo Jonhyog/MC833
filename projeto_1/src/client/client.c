@@ -84,18 +84,17 @@ int main(int argc, char *argv[])
 	char clear_line[128];
 	int len;
 
+	if(argc>2 && strcmp(argv[2], "-adm")==0){
+		printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
+	}
+	else{
+		printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
+	}
+
 	while (meta_hints.pkt_type != MUSIC_END){
-		if(argc>2 && strcmp(argv[2], "-adm")==0){
-			printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
-			printf("Digite a operação: ");
-		}
-		else{
-			printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
-			printf("Digite a operação: ");
-		}
+		printf("Digite a operação: ");
 		scanf(" %s", op);
 		fgets(clear_line, 128, stdin);
-		printf("%s\n", op);
 
 		if(strcmp(op, "add") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
 			meta.id = 0; // placeholder - true id decided by server
@@ -129,9 +128,6 @@ int main(int argc, char *argv[])
     		meta_hints.pkt_numres = 1;
     		meta_hints.pkt_status = 0;
 			buff = htonmm(&meta, &meta_hints);
-
-    		printf("META SIZE: %d\n", meta_hints.pkt_size);
-
     		len = (int) meta_hints.pkt_size;
     		sendall(sockfd, buff, &len);
     
@@ -154,9 +150,6 @@ int main(int argc, char *argv[])
     		meta_hints.pkt_status = 0;
 
 			buff = htonmm(&meta, &meta_hints);
-
-    		printf("META SIZE: %d\n", meta_hints.pkt_size);
-
     		len = (int) meta_hints.pkt_size;
     		sendall(sockfd, buff, &len);
 
@@ -194,52 +187,40 @@ int main(int argc, char *argv[])
 				if(strcmp(info, "id") == 0){
 					meta.id = atoi(strtok(NULL, "=\n"));
 					filter |= (1 << 0);
-					// filter[8] = '1';
 				}
 				if(strcmp(info, "year") == 0){
 					meta.release_year = atoi(strtok(NULL, "=\n"));
 					filter |= (1 << 1);
-					// filter[7] = '1';
 				}
 				if(strcmp(info, "title") == 0){
 					strcpy((char *) meta.title, strtok(NULL, "=\n"));
 					filter |= (1 << 2);
-					// filter[6] = '1';
 				}
 				if(strcmp(info, "interpreter") == 0){
 					strcpy((char *) meta.interpreter, strtok(NULL, "=\n"));
 					filter |= (1 << 3);
-					// filter[5] = '1';
 				}
 				if(strcmp(info, "lang") == 0){
 					strcpy((char *) meta.language, strtok(NULL, "=\n"));
 					filter |= (1 << 4);
-					// filter[4] = '1';
 				}
 				if(strcmp(info, "type") == 0){
 					strcpy((char *) meta.category, strtok(NULL, "=\n"));
 					filter |= (1 << 5);
-					// filter[3] = '1';
 				}
 				if(strcmp(info, "chorus") == 0){
 					strcpy((char *) meta.chorus, strtok(NULL, "=\n"));
 					filter |= (1 << 6);
-					// filter[3] = '1';
 				}
-				
         	}
 
 			printf("searching with filter %d\n", filter);
-			// meta_hints.pkt_filter = strtoul (filter, NULL, 0);
 			meta_hints.pkt_filter = filter;
 			meta_hints.pkt_op = MUSIC_LIST;
     		meta_hints.pkt_numres = 1;
     		meta_hints.pkt_status = 0;
 
 			buff = htonmm(&meta, &meta_hints);
-
-    		printf("META SIZE: %d\n", meta_hints.pkt_size);
-
     		len = (int) meta_hints.pkt_size;
 
     		sendall(sockfd, buff, &len);
@@ -279,7 +260,6 @@ int main(int argc, char *argv[])
 				meta_hints.pkt_type = MUSIC_END;
 
 				buff = htonmm(&meta, &meta_hints);
-				printf("META SIZE: %d\n", meta_hints.pkt_size);
 				len = (int) meta_hints.pkt_size;
 				sendall(sockfd, buff, &len);
 
