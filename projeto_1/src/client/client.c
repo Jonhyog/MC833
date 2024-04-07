@@ -182,6 +182,7 @@ int main(int argc, char *argv[])
 				counter++;
 			}
 
+			memset(&meta, 0, sizeof(MusicMeta));
 			for (int i = 0; i < counter; i++) {
 				char *info = strtok(tokens[i], "=");
 				if(strcmp(info, "id") == 0){
@@ -219,7 +220,7 @@ int main(int argc, char *argv[])
 			meta_hints.pkt_op = MUSIC_LIST;
     		meta_hints.pkt_numres = 1;
     		meta_hints.pkt_status = 0;
-
+			
 			buff = htonmm(&meta, &meta_hints);
     		len = (int) meta_hints.pkt_size;
 

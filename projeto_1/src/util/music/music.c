@@ -25,6 +25,19 @@ MusicLib* newlib(int max_size)
     return ml;
 }
 
+void clearmeta(MusicMeta *mm)
+{
+    mm->id = 0;
+    mm->release_year = 0;
+    
+    mm->title[0] = '\0';
+    mm->interpreter[0] = '\0';
+    mm->language[0] = '\0';
+    mm->category[0] = '\0';
+    mm->chorus[0] = '\0';
+    mm->fpath[0] = '\0';
+}
+
 void setmeta(MusicMeta *mm, char **params)
 {
     mm->id = atoi(params[0]);
@@ -158,7 +171,9 @@ int compare_field(MusicMeta *a, MusicMeta *b, int filter)
 
 MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size)
 {
-	MusicMeta *res = (MusicMeta *) calloc(ml->size, sizeof(MusicMeta));
+    MusicMeta *res = (MusicMeta *) malloc(sizeof(MusicMeta) * ml->size);
+
+    for (int i = 0; i < ml->size; i++) clearmeta(&res[i]);
 
 	*res_size = 0;
 	for (int i = 0; i < ml->size; i++) {
