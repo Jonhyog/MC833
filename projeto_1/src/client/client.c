@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
     MusicMeta meta;
     MMHints  meta_hints;
     uint16_t *buff;
-	uint16_t response_buff[2048];
+	uint16_t response_buff[650000];
 	char op[10];
 	char clear_line[128];
 	int len;
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
     		sendall(sockfd, buff, &len);
     
 			printf("waiting response\n");
-			recvall(sockfd, response_buff, 2048, 0);
+			recvall(sockfd, response_buff, 650000, 0);
 			ntohmm(response_buff, &meta_hints);
 
 			if (meta_hints.pkt_type == MUSIC_RES) {
