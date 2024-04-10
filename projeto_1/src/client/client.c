@@ -168,9 +168,9 @@ int main(int argc, char *argv[])
 
 		else if(strcmp(op, "list") == 0){
 			char fields[2048];
+			printf("Os parâmtros disponíveis para filtrar são: id, year, title, interpreter, lang, type, chorus\nDigite aqueles que desejar da forma 'campo=valor', separando-os com ';'\n");
 			fgets((char *) fields, 2048, stdin);
 
-			// char filter[8];
 			MusicMeta *server_res;
 			uint16_t filter = 0;
 			int counter = 0;
@@ -189,29 +189,32 @@ int main(int argc, char *argv[])
 					meta.id = atoi(strtok(NULL, "=\n"));
 					filter |= (1 << 0);
 				}
-				if(strcmp(info, "year") == 0){
+				else if(strcmp(info, "year") == 0){
 					meta.release_year = atoi(strtok(NULL, "=\n"));
 					filter |= (1 << 1);
 				}
-				if(strcmp(info, "title") == 0){
+				else if(strcmp(info, "title") == 0){
 					strcpy((char *) meta.title, strtok(NULL, "=\n"));
 					filter |= (1 << 2);
 				}
-				if(strcmp(info, "interpreter") == 0){
+				else if(strcmp(info, "interpreter") == 0){
 					strcpy((char *) meta.interpreter, strtok(NULL, "=\n"));
 					filter |= (1 << 3);
 				}
-				if(strcmp(info, "lang") == 0){
+				else if(strcmp(info, "lang") == 0){
 					strcpy((char *) meta.language, strtok(NULL, "=\n"));
 					filter |= (1 << 4);
 				}
-				if(strcmp(info, "type") == 0){
+				else if(strcmp(info, "type") == 0){
 					strcpy((char *) meta.category, strtok(NULL, "=\n"));
 					filter |= (1 << 5);
 				}
-				if(strcmp(info, "chorus") == 0){
+				else if(strcmp(info, "chorus") == 0){
 					strcpy((char *) meta.chorus, strtok(NULL, "=\n"));
 					filter |= (1 << 6);
+				}
+				else{
+					printf("Parâmetro '%s' não identificado.\n", info);
 				}
         	}
 
