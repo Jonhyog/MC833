@@ -174,6 +174,7 @@ int main(int argc, char *argv[])
 			MusicMeta *server_res;
 			uint16_t filter = 0;
 			int counter = 0;
+			int not_identified = 0;
 			char **tokens = (char **) malloc(sizeof(char *) * 8);
 
 			for (char *tok = strtok(fields, ";"); tok && *tok; tok = strtok(NULL, ";\n")) {
@@ -213,43 +214,49 @@ int main(int argc, char *argv[])
 					strcpy((char *) meta.chorus, strtok(NULL, "=\n"));
 					filter |= (1 << 6);
 				}
+				else if (strcmp(info, "\n") == 0) {
+					
+				}
 				else{
+					not_identified = 1;
 					printf("Parâmetro '%s' não identificado.\n", info);
 				}
         	}
 
-			printf("searching with filter %d\n", filter);
-			meta_hints.pkt_filter = filter;
-			meta_hints.pkt_op = MUSIC_LIST;
-    		meta_hints.pkt_numres = 1;
-    		meta_hints.pkt_status = 0;
-			
-			buff = htonmm(&meta, &meta_hints);
-    		len = (int) meta_hints.pkt_size;
+			if (!not_identified) {
+				printf("searching with filter %d\n", filter);
+				meta_hints.pkt_filter = filter;
+				meta_hints.pkt_op = MUSIC_LIST;
+				meta_hints.pkt_numres = 1;
+				meta_hints.pkt_status = 0;
+				
+				buff = htonmm(&meta, &meta_hints);
+				len = (int) meta_hints.pkt_size;
 
-    		sendall(sockfd, buff, &len);
-			printf("waiting response\n");
-			recvall(sockfd, response_buff, 2048, 0);
-			server_res = ntohmm(response_buff, &meta_hints);
-	
-			if (meta_hints.pkt_type == MUSIC_RES) {
-				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-				printf("listing musics with matching fields\n");
+				sendall(sockfd, buff, &len);
+				printf("waiting response\n");
+				recvall(sockfd, response_buff, 2048, 0);
+				server_res = ntohmm(response_buff, &meta_hints);
+		
+				if (meta_hints.pkt_type == MUSIC_RES) {
+					printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+					printf("listing musics with matching fields\n");
 
-				if(meta_hints.pkt_numres == 0){
-					printf("\nNenhuma música com essas carcterísticas encontrada!\n");
-				}
+					if(meta_hints.pkt_numres == 0){
+						printf("\nNenhuma música com essas carcterísticas encontrada!\n");
+					}
 
-				for (int i = 0; i < meta_hints.pkt_numres; i++) {
-					printf("\t%d, %d, %s, %s, %s, %s, %s\n",
-						server_res[i].id,
-						server_res[i].release_year,
-						server_res[i].title,
-						server_res[i].interpreter,
-						server_res[i].language,
-						server_res[i].category,
-						server_res[i].chorus
-            		);
+					for (int i = 0; i < meta_hints.pkt_numres; i++) {
+						printf("\t%d, %d, %s, %s, %s, %s, %s\n",
+							server_res[i].id,
+							server_res[i].release_year,
+							server_res[i].title,
+							server_res[i].interpreter,
+							server_res[i].language,
+							server_res[i].category,
+							server_res[i].chorus
+						);
+					}
 				}
 			}
 		}
