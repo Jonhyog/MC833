@@ -3,17 +3,17 @@
 
 #include "parser.h"
 
-#define MAX_FIELD_SIZE 128
+#define STD_FIELD_SIZE 128
 
 typedef struct {
     int  id;
     int  release_year;
-    unsigned char title[MAX_FIELD_SIZE];
-    unsigned char interpreter[MAX_FIELD_SIZE];
-    unsigned char language[MAX_FIELD_SIZE];
-    unsigned char category[MAX_FIELD_SIZE];
-    unsigned char chorus[MAX_FIELD_SIZE];
-    unsigned char fpath[MAX_FIELD_SIZE];
+    unsigned char title[STD_FIELD_SIZE];
+    unsigned char interpreter[STD_FIELD_SIZE];
+    unsigned char language[STD_FIELD_SIZE];
+    unsigned char category[STD_FIELD_SIZE];
+    unsigned char chorus[2 * STD_FIELD_SIZE];
+    unsigned char fpath[STD_FIELD_SIZE];
 } MusicMeta;
 
 typedef struct {
