@@ -25,6 +25,19 @@ MusicLib* newlib(int max_size)
     return ml;
 }
 
+void clearmeta(MusicMeta *mm)
+{
+    mm->id = 0;
+    mm->release_year = 0;
+    
+    mm->title[0] = '\0';
+    mm->interpreter[0] = '\0';
+    mm->language[0] = '\0';
+    mm->category[0] = '\0';
+    mm->chorus[0] = '\0';
+    mm->fpath[0] = '\0';
+}
+
 void setmeta(MusicMeta *mm, char **params)
 {
     mm->id = atoi(params[0]);
@@ -48,6 +61,26 @@ void loadmusics(MusicLib *ml, CSV *db)
     for (int i = 0; i < ml->size; i++) {
         setmeta(&ml->musics[i].meta, db->data[i]);
     }
+}
+
+void savemusics(MusicLib *ml, CSV *db)
+{
+    // updates db size
+    db->lines = ml->size;
+    db->collumns = 8;
+
+    // copies data to db
+    for (int i = 0; i < db->lines; i++) {
+        sprintf(db->data[i][0], "%d", ml->musics[i].meta.id);
+        sprintf(db->data[i][1], "%d", ml->musics[i].meta.release_year);
+        strcpy(db->data[i][2], (char *) ml->musics[i].meta.title);
+        strcpy(db->data[i][3], (char *) ml->musics[i].meta.interpreter);
+        strcpy(db->data[i][4], (char *) ml->musics[i].meta.language);
+        strcpy(db->data[i][5], (char *) ml->musics[i].meta.category);
+        strcpy(db->data[i][6], (char *) ml->musics[i].meta.chorus);
+        // strcpy(db->data[i][7], ""); // placeholder for fpath
+    }
+    
 }
 
 void meta_copy(MusicMeta *dest, MusicMeta *src)
@@ -81,7 +114,7 @@ void add_music(MusicLib *ml, MusicData *md)
     ml->size++;
 }
 
-void rmv_music(MusicLib *ml, int id)
+int rmv_music(MusicLib *ml, int id)
 {
     int pos = -1;
 
@@ -93,11 +126,12 @@ void rmv_music(MusicLib *ml, int id)
 	}
 
     // FIX-ME: should set a error
-	if (pos == - 1) return;
+	if (pos == - 1) return 1;
 
 	for (int i = pos; i < ml->size - 1; i++)
         msc_copy(&ml->musics[i], &ml->musics[i + 1]);
 	ml->size--;
+    return 0;
 }
 
 int compare_field(MusicMeta *a, MusicMeta *b, int filter)
@@ -137,7 +171,9 @@ int compare_field(MusicMeta *a, MusicMeta *b, int filter)
 
 MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size)
 {
-	MusicMeta *res = (MusicMeta *) calloc(ml->size, sizeof(MusicMeta));
+    MusicMeta *res = (MusicMeta *) malloc(sizeof(MusicMeta) * ml->size);
+
+    for (int i = 0; i < ml->size; i++) clearmeta(&res[i]);
 
 	*res_size = 0;
 	for (int i = 0; i < ml->size; i++) {
@@ -158,11 +194,9 @@ MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size)
 
         if (found) {
             meta_copy(&res[*res_size], &ml->musics[i].meta);
-            printf("id check: %d x %d\n", res[*res_size].id, ml->musics[i].meta.id);
 		    *res_size += 1;
         }
 	}
 
-    printf("server: found %d musics with matching fields\n", *res_size);
 	return res;
 }

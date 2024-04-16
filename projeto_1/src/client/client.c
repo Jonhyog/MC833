@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 	int rv;
 	char s[INET6_ADDRSTRLEN];
 
-	if (argc != 2) {
+	if (argc < 2) {
 	    fprintf(stderr,"usage: client hostname\n");
 	    exit(1);
 	}
@@ -79,28 +79,24 @@ int main(int argc, char *argv[])
     MusicMeta meta;
     MMHints  meta_hints;
     uint16_t *buff;
-	uint16_t response_buff[2048];
+	uint16_t response_buff[650000];
 	char op[10];
 	char clear_line[128];
-	// char entrada[2048];
 	int len;
 
-// add x
-// rem x
-// list year=x
-// list lang=x
-// list type=x
-// list id=x
-// list
+	if(argc>2 && strcmp(argv[2], "-adm")==0){
+		printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
+	}
+	else{
+		printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
+	}
 
 	while (meta_hints.pkt_type != MUSIC_END){
-		printf("choose operation (add, rem, list): ");
+		printf("Digite a operação: ");
 		scanf(" %s", op);
 		fgets(clear_line, 128, stdin);
-		printf("%s\n", op);
-		// op = strtok(entrada, " ");
 
-		if(strcmp(op, "add") == 0){
+		if(strcmp(op, "add") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
 			meta.id = 0; // placeholder - true id decided by server
 
 			//add musica
@@ -132,14 +128,11 @@ int main(int argc, char *argv[])
     		meta_hints.pkt_numres = 1;
     		meta_hints.pkt_status = 0;
 			buff = htonmm(&meta, &meta_hints);
-
-    		printf("META SIZE: %d\n", meta_hints.pkt_size);
-
     		len = (int) meta_hints.pkt_size;
     		sendall(sockfd, buff, &len);
     
 			printf("waiting response\n");
-			recvall(sockfd, response_buff, 2048, 0);
+			recvall(sockfd, response_buff, 650000, 0);
 			ntohmm(response_buff, &meta_hints);
 
 			if (meta_hints.pkt_type == MUSIC_RES) {
@@ -147,7 +140,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if(strcmp(op, "rem") == 0){
+		 else if(strcmp(op, "rem") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
 			printf("\n ID: ");
 			scanf(" %d", &meta.id);
 
@@ -157,9 +150,6 @@ int main(int argc, char *argv[])
     		meta_hints.pkt_status = 0;
 
 			buff = htonmm(&meta, &meta_hints);
-
-    		printf("META SIZE: %d\n", meta_hints.pkt_size);
-
     		len = (int) meta_hints.pkt_size;
     		sendall(sockfd, buff, &len);
 
@@ -167,20 +157,24 @@ int main(int argc, char *argv[])
 			recvall(sockfd, response_buff, 2048, 0);
 			ntohmm(response_buff, &meta_hints);
 
+			if(meta_hints.pkt_status != MUSIC_OK){
+				printf("\nNenhuma música com este id\n");
+			}
+
 			if (meta_hints.pkt_type == MUSIC_RES) {
 				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
 			}
 		}
 
-		//tok vai ser do tipo id=x lan=y
-		if(strcmp(op, "list") == 0){
+		else if(strcmp(op, "list") == 0){
 			char fields[2048];
+			printf("Os parâmtros disponíveis para filtrar são: id, year, title, interpreter, lang, type, chorus\nDigite aqueles que desejar da forma 'campo=valor', separando-os com ';'\n");
 			fgets((char *) fields, 2048, stdin);
 
-			// char filter[8];
 			MusicMeta *server_res;
 			uint16_t filter = 0;
 			int counter = 0;
+			int not_identified = 0;
 			char **tokens = (char **) malloc(sizeof(char *) * 8);
 
 			for (char *tok = strtok(fields, ";"); tok && *tok; tok = strtok(NULL, ";\n")) {
@@ -189,90 +183,113 @@ int main(int argc, char *argv[])
 				counter++;
 			}
 
+			memset(&meta, 0, sizeof(MusicMeta));
 			for (int i = 0; i < counter; i++) {
 				char *info = strtok(tokens[i], "=");
 				if(strcmp(info, "id") == 0){
 					meta.id = atoi(strtok(NULL, "=\n"));
 					filter |= (1 << 0);
-					// filter[8] = '1';
 				}
-				if(strcmp(info, "year") == 0){
+				else if(strcmp(info, "year") == 0){
 					meta.release_year = atoi(strtok(NULL, "=\n"));
 					filter |= (1 << 1);
-					// filter[7] = '1';
 				}
-				if(strcmp(info, "title") == 0){
+				else if(strcmp(info, "title") == 0){
 					strcpy((char *) meta.title, strtok(NULL, "=\n"));
 					filter |= (1 << 2);
-					// filter[6] = '1';
 				}
-				if(strcmp(info, "interpreter") == 0){
+				else if(strcmp(info, "interpreter") == 0){
 					strcpy((char *) meta.interpreter, strtok(NULL, "=\n"));
 					filter |= (1 << 3);
-					// filter[5] = '1';
 				}
-				if(strcmp(info, "lang") == 0){
+				else if(strcmp(info, "lang") == 0){
 					strcpy((char *) meta.language, strtok(NULL, "=\n"));
 					filter |= (1 << 4);
-					// filter[4] = '1';
 				}
-				if(strcmp(info, "type") == 0){
+				else if(strcmp(info, "type") == 0){
 					strcpy((char *) meta.category, strtok(NULL, "=\n"));
 					filter |= (1 << 5);
-					// filter[3] = '1';
 				}
-				if(strcmp(info, "chorus") == 0){
+				else if(strcmp(info, "chorus") == 0){
 					strcpy((char *) meta.chorus, strtok(NULL, "=\n"));
 					filter |= (1 << 6);
-					// filter[3] = '1';
 				}
-				
+				else if (strcmp(info, "\n") == 0) {
+					
+				}
+				else{
+					not_identified = 1;
+					printf("Parâmetro '%s' não identificado.\n", info);
+				}
         	}
 
-			printf("searching with filter %d\n", filter);
-			// meta_hints.pkt_filter = strtoul (filter, NULL, 0);
-			meta_hints.pkt_filter = filter;
-			meta_hints.pkt_op = MUSIC_LIST;
-    		meta_hints.pkt_numres = 1;
-    		meta_hints.pkt_status = 0;
+			if (!not_identified) {
+				printf("searching with filter %d\n", filter);
+				meta_hints.pkt_filter = filter;
+				meta_hints.pkt_op = MUSIC_LIST;
+				meta_hints.pkt_numres = 1;
+				meta_hints.pkt_status = 0;
+				
+				buff = htonmm(&meta, &meta_hints);
+				len = (int) meta_hints.pkt_size;
 
-			buff = htonmm(&meta, &meta_hints);
+				sendall(sockfd, buff, &len);
+				printf("waiting response\n");
+				recvall(sockfd, response_buff, 2048, 0);
+				server_res = ntohmm(response_buff, &meta_hints);
+		
+				if (meta_hints.pkt_type == MUSIC_RES) {
+					printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+					printf("listing musics with matching fields\n");
 
-    		printf("META SIZE: %d\n", meta_hints.pkt_size);
+					if(meta_hints.pkt_numres == 0){
+						printf("\nNenhuma música com essas carcterísticas encontrada!\n");
+					}
 
-    		len = (int) meta_hints.pkt_size;
-
-    		sendall(sockfd, buff, &len);
-			printf("waiting response\n");
-			recvall(sockfd, response_buff, 2048, 0);
-			server_res = ntohmm(response_buff, &meta_hints);
-	
-			if (meta_hints.pkt_type == MUSIC_RES) {
-				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-				printf("listing musics with matching fields\n");
-
-				for (int i = 0; i < meta_hints.pkt_numres; i++) {
-					printf("\t%d, %d, %s, %s, %s, %s, %s\n",
-						server_res[i].id,
-						server_res[i].release_year,
-						server_res[i].title,
-						server_res[i].interpreter,
-						server_res[i].language,
-						server_res[i].category,
-						server_res[i].chorus
-            		);
+					for (int i = 0; i < meta_hints.pkt_numres; i++) {
+						printf("\t%d, %d, %s, %s, %s, %s, %s\n",
+							server_res[i].id,
+							server_res[i].release_year,
+							server_res[i].title,
+							server_res[i].interpreter,
+							server_res[i].language,
+							server_res[i].category,
+							server_res[i].chorus
+						);
+					}
 				}
 			}
+		}
+		else if(strcmp(op, "exit") == 0){
+			char confirm[3];
+			printf("Deseja sair? (y/n): ");
+			scanf("%s", confirm);
+			if(strcmp(confirm, "y") == 0){
+				meta_hints.pkt_op = MUSIC_CLOSE;
+    			meta_hints.pkt_numres = 1;
+    			meta_hints.pkt_status = 0;
+				meta_hints.pkt_type = MUSIC_END;
+
+				buff = htonmm(&meta, &meta_hints);
+				len = (int) meta_hints.pkt_size;
+				sendall(sockfd, buff, &len);
+
+				printf("waiting response\n");
+				recvall(sockfd, response_buff, 2048, 0);
+				ntohmm(response_buff, &meta_hints);
+				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
+
+				if (meta_hints.pkt_status != MUSIC_OK) {
+					meta_hints.pkt_type = MUSIC_ADD; // will be overwritten in next iter
+				}
+			}
+		}
+		else{
+			printf("Operação não suportada ou reservada para administradores, tente novamente\n");
 		}
 	}
 
 	close(sockfd);
 
 	return 0;
-
-
-
-	
-
-	
 }
