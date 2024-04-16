@@ -71,7 +71,18 @@ void service_loop(int fd, MusicLib *db)
 		switch (hints.pkt_op)
 		{
 		case MUSIC_ADD:
+			printf("server: adding music \n");
+			printf("\t%d, %d, %s, %s, %s, %s, %s\n",
+				mm->id,
+				mm->release_year,
+				mm->title,
+				mm->interpreter,
+				mm->language,
+				mm->category,
+				mm->chorus
+			);
 			temp = (MusicData *) malloc(sizeof(MusicData));
+			temp->data_size = 0;
 			meta_copy(&temp->meta, mm);
 			add_music(db, temp);
 			free(temp);
