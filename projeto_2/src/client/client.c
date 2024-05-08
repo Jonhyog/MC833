@@ -27,12 +27,198 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+int create_socket(char *addr, char *port, struct addrinfo hints, struct addrinfo **p)
+{
+	int sockfd, rv;
+	struct addrinfo *servinfo, *p_temp;
+
+	if ((rv = getaddrinfo(addr, PORT, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+		return 1;
+	}
+
+	// loop through all the results and connect to the first we can
+	for(p_temp = servinfo; p_temp != NULL; p_temp = p_temp->ai_next) {
+		if ((sockfd = socket(p_temp->ai_family, p_temp->ai_socktype,
+				p_temp->ai_protocol)) == -1) {
+			perror("client: socket");
+			continue;
+		}
+
+		if (connect(sockfd, p_temp->ai_addr, p_temp->ai_addrlen) == -1) {
+			perror("client: connect");
+			close(sockfd);
+			continue;
+		}
+
+		break;
+	}
+
+	freeaddrinfo(servinfo); // all done with this structure
+
+	if (p_temp == NULL) {
+		fprintf(stderr, "client: failed to connect\n");
+		return 2;
+	}
+
+	*(p) = p_temp;
+	return sockfd;
+
+}
+
+void greet_prompt(int auth)
+{
+	if (auth)
+		printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
+	else
+		printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
+}
+
+void handle_add(int auth, MusicMeta *mm, MMHints *hints)
+{
+	if (!auth) {
+		printf("Você não tem permissão para realizar essa operação!");
+		return;
+	}
+
+	// Gets Music MetaData
+	// Placeholder - ID is given by server
+	mm->id = 0; 
+
+	printf("\n Título: ");
+	fgets((char *) &mm->title, 128, stdin);
+	mm->title[strcspn((char *) mm->title, "\n")] = 0;
+
+	printf("\n Intérprete: ");
+	fgets((char *) &mm->interpreter, 128, stdin);
+	mm->interpreter[strcspn((char *) mm->interpreter, "\n")] = 0;
+
+	printf("\n Idioma: ");
+	fgets((char *) &mm->language, 128, stdin);
+	mm->language[strcspn((char *) mm->language, "\n")] = 0;
+
+	printf("\n Tipo de música: ");
+	fgets((char *) &mm->category, 128, stdin);
+	mm->category[strcspn((char *) mm->category, "\n")] = 0;
+
+	printf("\n Refrão: ");
+	fgets((char *) &mm->chorus, 128, stdin);
+	mm->chorus[strcspn((char *) mm->chorus, "\n")] = 0;
+
+	printf("\n Ano de Lançamento: ");
+	scanf(" %d", &mm->release_year);
+
+	// Sets up hints for pkt
+	hints->pkt_filter = 0;
+	hints->pkt_op = MUSIC_ADD;
+	hints->pkt_numres = 1;
+	hints->pkt_status = 0;
+}
+
+void handle_remove(int auth, MusicMeta *mm, MMHints *hints)
+{
+	if (!auth) {
+		printf("Você não tem permissão para realizar essa operação!");
+		return;
+	}
+
+	// Gets ID MetaData
+	printf("\n ID: ");
+	scanf(" %d", &mm->id);
+
+	hints->pkt_filter = 0;
+	hints->pkt_op = MUSIC_DEL;
+	hints->pkt_numres = 1;
+	hints->pkt_status = 0;
+}
+
+void handle_list(int auth, MusicMeta *mm, MMHints *hints)
+{
+	if (!auth) {
+		printf("Você não tem permissão para realizar essa operação!");
+		return;
+	}
+}
+
+void handle_download(int auth, MusicMeta *mm, MMHints *hints)
+{
+	if (!auth) {
+		printf("Você não tem permissão para realizar essa operação!");
+		return;
+	}
+}
+
+void handle_exit(int auth, MusicMeta *mm, MMHints *hints)
+{
+	char confirm[3];
+
+	if (!auth) {
+		printf("Você não tem permissão para realizar essa operação!");
+		return;
+	}
+
+	// Exit Confirmation
+	printf("Deseja sair? (y/n): ");
+	scanf("%s", confirm);
+
+	// Sets up exit pkt
+	if(strcmp(confirm, "y") == 0){
+		hints->pkt_op = MUSIC_CLOSE;
+		hints->pkt_numres = 1;
+		hints->pkt_status = 0;
+		hints->pkt_type = MUSIC_END;
+	}
+}
+
+void handle_operation(char *op, int auth)
+{
+	int i;
+	char operations[] = {"add", "rem", "list", "download", "exit"};
+	MusicMeta meta;
+    MMHints  meta_hints;
+
+	for (i = 0; i < 5; i++) {
+		if (strcmp(op, operations[i]) == 0) break;
+	}
+
+	switch (i)
+	{
+	case 0:
+		handle_add(auth, &meta, &meta_hints);
+		break;
+	case 1:
+		handle_remove(auth, &meta, &meta_hints);
+		break;
+	case 2:
+		handle_list(1, &meta, &meta_hints);
+		break;
+	case 3:
+		handle_download(1, &meta, &meta_hints);
+		break;
+	case 4:
+		handle_exit(1, &meta, &meta_hints);
+		break;
+	default:
+		printf("Operação não suportada. Tente novamente\n");
+		return;
+	}
+
+	// Generates and sends pkt
+
+}
+
 int main(int argc, char *argv[])
 {
 	int sockfd, downloadfd;  
-	struct addrinfo hints, *servinfo, *p;
-	int rv;
-	char s[INET6_ADDRSTRLEN];
+	struct addrinfo hints, *p;
+    MusicMeta meta;
+    MMHints  meta_hints;
+    uint16_t *buff;
+	uint16_t response_buff[650000];
+	char op[10];
+	char clear_line[128];
+	int len;
+	int auth, state = 0; // Waiting Input == 0 : Waiting Response = 1
 
 	if (argc < 2) {
 	    fprintf(stderr,"usage: client hostname\n");
@@ -43,88 +229,34 @@ int main(int argc, char *argv[])
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
+	sockfd = create_socket(argv[1], PORT, hints, &p);
 
-	if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-
-	// loop through all the results and connect to the first we can
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,
-				p->ai_protocol)) == -1) {
-			perror("client: socket");
-			continue;
-		}
-
-		if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-			perror("client: connect");
-			close(sockfd);
-			continue;
-		}
-
-		break;
-	}
-
-	if (p == NULL) {
-		fprintf(stderr, "client: failed to connect\n");
-		return 2;
-	}
-
-	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
-			s, sizeof s);
-	printf("client: connecting to %s\n", s);
-
-	freeaddrinfo(servinfo); // all done with this structure
-
+	// FIX-ME: USE IPv6
 	// Creates UDP Socket
 	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET6;
+	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
+	downloadfd = create_socket(argv[1], PORT, hints, &p);
 
-	if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-
-	// loop through all the results and connect to the first we can
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if ((downloadfd = socket(p->ai_family, p->ai_socktype,
-				p->ai_protocol)) == -1) {
-			perror("client: socket");
-			continue;
-		}
-
-		if (connect(downloadfd, p->ai_addr, p->ai_addrlen) == -1) {
-			perror("client: connect");
-			close(downloadfd);
-			continue;
-		}
-
-		break;
-	}
-
-	if (p == NULL) {
-		fprintf(stderr, "client: failed to connect\n");
-		return 2;
-	}
-
-    MusicMeta meta;
-    MMHints  meta_hints;
-    uint16_t *buff;
-	uint16_t response_buff[650000];
-	char op[10];
-	char clear_line[128];
-	int len;
-
-	if(argc>2 && strcmp(argv[2], "-adm")==0){
-		printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
-	}
-	else{
-		printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
-	}
+	// Handles user input
+	printf("%d\n", state);
+	auth = argc > 2 && strcmp(argv[2], "-adm") == 0 ? 1 : 0;
+	greet_prompt(auth);
 
 	while (meta_hints.pkt_type != MUSIC_END){
+		if (state == 0) {
+			state = 1;
+
+			printf("Digite a operação: ");
+			scanf(" %s", op);
+			fgets(clear_line, 128, stdin);
+
+			handle_operation(op, auth);
+
+			// handle input
+		} else {
+			// await responde
+		}
 		printf("Digite a operação: ");
 		scanf(" %s", op);
 		fgets(clear_line, 128, stdin);
