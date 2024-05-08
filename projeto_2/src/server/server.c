@@ -21,6 +21,8 @@
 
 #define BUFFER_SIZE 2048
 
+#define MAX(A, B) (A > B) ? A : B
+
 MusicLib *db;
 FILE *stream;
 CSV *csv;
@@ -46,6 +48,50 @@ void *get_in_addr(struct sockaddr *sa)
 	}
 
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+int create_socket(char *port, struct addrinfo hints)
+{
+	int sockfd;
+	int rv, yes = 1;
+	struct addrinfo *servinfo, *p;
+
+	if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+		return 1;
+	}
+
+	// loop through all the results and bind to the first we can
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,
+				p->ai_protocol)) == -1) {
+			perror("server: socket");
+			continue;
+		}
+
+		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+				sizeof(int)) == -1) {
+			perror("setsockopt");
+			exit(1);
+		}
+
+		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sockfd);
+			perror("server: bind");
+			continue;
+		}
+
+		break;
+	}
+
+	freeaddrinfo(servinfo);
+
+	if (p == NULL)  {
+		fprintf(stderr, "server: failed to bind\n");
+		exit(1);
+	}
+
+	return sockfd;
 }
 
 void service_loop(int fd, MusicLib *db)
@@ -203,15 +249,15 @@ void service_loop(int fd, MusicLib *db)
 
 int main(int argc, char *argv[])
 {
-	int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
-	struct addrinfo hints, *servinfo, *p;
+	int sockfd, new_fd, downloadfd, maxfdp1;  // listen on sock_fd, new connection on new_fd
+	int nready;
+	fd_set rset;
+	struct addrinfo hints;
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
 	struct sigaction sa;
-	int yes=1;
 	char s[INET6_ADDRSTRLEN];
 	char next_id[10];
-	int rv;
 
     if (argc != 2) {
         fprintf(stderr, "usage: server musics.csv\n");
@@ -223,42 +269,14 @@ int main(int argc, char *argv[])
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
+	sockfd = create_socket(PORT, hints);
 
-	if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-
-	// loop through all the results and bind to the first we can
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,
-				p->ai_protocol)) == -1) {
-			perror("server: socket");
-			continue;
-		}
-
-		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-				sizeof(int)) == -1) {
-			perror("setsockopt");
-			exit(1);
-		}
-
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-			close(sockfd);
-			perror("server: bind");
-			continue;
-		}
-
-		break;
-	}
-
-	freeaddrinfo(servinfo);
-
-	if (p == NULL)  {
-		fprintf(stderr, "server: failed to bind\n");
-		exit(1);
-	}
-
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE;
+	downloadfd = create_socket(PORT, hints);
+	
 	if (listen(sockfd, BACKLOG) == -1) {
 		perror("listen");
 		exit(1);
@@ -274,42 +292,81 @@ int main(int argc, char *argv[])
 
     // main accept() loop
 	printf("server: waiting for connections...\n");
+	FD_ZERO(&rset);
+	maxfdp1 = MAX(sockfd, downloadfd) + 1;
 	while (1) {
-		sin_size = sizeof their_addr;
-		new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-		if (new_fd == -1) {
-			perror("accept");
-			continue;
+		FD_SET(sockfd, &rset);
+		FD_SET(downloadfd, &rset);
+
+		if ((nready = select(maxfdp1, &rset, NULL, NULL, NULL)) < 0) {
+			if (errno == EINTR)
+				continue;
+			else {
+				perror("select_error");
+				exit(1);
+			}
 		}
 
-		inet_ntop(their_addr.ss_family,
-			get_in_addr((struct sockaddr *)&their_addr),
-			s, sizeof s);
-		printf("server: got connection from %s\n", s);
+		// TCP Service Loop
+		if (FD_ISSET(sockfd, &rset)) {
+			sin_size = sizeof their_addr;
+			new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+			if (new_fd == -1) {
+				perror("accept");
+				continue;
+			}
 
-		if (!fork()) {
-			close(sockfd);
+			inet_ntop(their_addr.ss_family,
+				get_in_addr((struct sockaddr *)&their_addr),
+				s, sizeof s);
+			printf("server: got connection from %s\n", s);
 
-			db = newlib(128);
-    		csv = newcsv(128, 8);
+			if (!fork()) {
+				close(sockfd);
 
-			// loads db metadata
-			stream = fopen("music_lib.meta", "r");
-			fgets(next_id, 10, stream);
-			db->next_id = atoi(next_id);
-			
-			// loads musics data to memory
-			stream = fopen(argv[1], "r");
-			strcpy(fpath, argv[1]);
-			parsecsv(stream, csv, ";\n", 0);
-			loadmusics(db, csv);
+				db = newlib(128);
+				csv = newcsv(128, 8);
 
-            service_loop(new_fd, db);
+				// loads db metadata
+				stream = fopen("music_lib.meta", "r");
+				fgets(next_id, 10, stream);
+				db->next_id = atoi(next_id);
+				
+				// loads musics data to memory
+				stream = fopen(argv[1], "r");
+				strcpy(fpath, argv[1]);
+				parsecsv(stream, csv, ";\n", 0);
+				loadmusics(db, csv);
+
+				service_loop(new_fd, db);
+				close(new_fd);
+				exit(0);
+			}
+
 			close(new_fd);
-			exit(0);
 		}
 
-		close(new_fd);
+		// UDP Service Loop
+		if (FD_ISSET(downloadfd, &rset)) {
+			uint16_t buff[1000];
+			MusicMeta *mm;
+    		MMHints hints;
+			sin_size = sizeof their_addr;
+			int n = recvfrom(downloadfd, buff, 1000, 0, (struct sockaddr *) s, &sin_size);
+
+			printf("server: received %d bytes using UDP!\n", n);
+
+			// unpacks data
+			memset(&hints, 0, sizeof(MMHints));
+			mm = ntohmm(buff, &hints);
+
+			if (hints.pkt_op == MUSIC_GET) {
+				printf("server: sending file for music %d\n", mm->id);
+			} else {
+				perror("server: operation is not supported via UDP\n");
+
+			}
+		}
 	}
 
 	return 0;

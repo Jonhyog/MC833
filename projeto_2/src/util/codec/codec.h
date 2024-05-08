@@ -12,6 +12,7 @@
 #define MUSIC_DEL  0b01
 #define MUSIC_LIST 0b10
 #define MUSIC_CLOSE  0b11
+#define MUSIC_GET  0b100
 
 // pkt_types
 #define MUSIC_OPS  0b00

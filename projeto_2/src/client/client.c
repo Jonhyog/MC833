@@ -29,7 +29,7 @@ void *get_in_addr(struct sockaddr *sa)
 
 int main(int argc, char *argv[])
 {
-	int sockfd;  
+	int sockfd, downloadfd;  
 	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	char s[INET6_ADDRSTRLEN];
@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
 	    exit(1);
 	}
 
+	// Creates TCP Socket
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
@@ -75,6 +76,38 @@ int main(int argc, char *argv[])
 	printf("client: connecting to %s\n", s);
 
 	freeaddrinfo(servinfo); // all done with this structure
+
+	// Creates UDP Socket
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+
+	if ((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+		return 1;
+	}
+
+	// loop through all the results and connect to the first we can
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if ((downloadfd = socket(p->ai_family, p->ai_socktype,
+				p->ai_protocol)) == -1) {
+			perror("client: socket");
+			continue;
+		}
+
+		if (connect(downloadfd, p->ai_addr, p->ai_addrlen) == -1) {
+			perror("client: connect");
+			close(downloadfd);
+			continue;
+		}
+
+		break;
+	}
+
+	if (p == NULL) {
+		fprintf(stderr, "client: failed to connect\n");
+		return 2;
+	}
 
     MusicMeta meta;
     MMHints  meta_hints;
@@ -259,6 +292,24 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
+		}
+		else if (strcmp(op, "download") == 0) {
+			printf("ID: ");
+			scanf(" %d", &meta.id);
+
+			meta_hints.pkt_filter = 0;
+    		meta_hints.pkt_op = MUSIC_GET;
+    		meta_hints.pkt_numres = 1;
+    		meta_hints.pkt_status = 0;
+
+			buff = htonmm(&meta, &meta_hints);
+    		len = (int) meta_hints.pkt_size;
+
+			if (sendto(downloadfd, buff, len, 0, p->ai_addr, p->ai_addrlen) == -1) {
+				perror("failed to send udp pkt");
+				exit(1);
+			}
+			
 		}
 		else if(strcmp(op, "exit") == 0){
 			char confirm[3];
