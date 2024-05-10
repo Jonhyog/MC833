@@ -74,11 +74,11 @@ void greet_prompt(int auth)
 		printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
 }
 
-void handle_add(int auth, MusicMeta *mm, MMHints *hints)
+int handle_add(int auth, MusicMeta *mm, MMHints *hints)
 {
 	if (!auth) {
 		printf("Você não tem permissão para realizar essa operação!");
-		return;
+		return 1;
 	}
 
 	// Gets Music MetaData
@@ -113,13 +113,15 @@ void handle_add(int auth, MusicMeta *mm, MMHints *hints)
 	hints->pkt_op = MUSIC_ADD;
 	hints->pkt_numres = 1;
 	hints->pkt_status = 0;
+
+	return 0;
 }
 
-void handle_remove(int auth, MusicMeta *mm, MMHints *hints)
+int handle_remove(int auth, MusicMeta *mm, MMHints *hints)
 {
 	if (!auth) {
 		printf("Você não tem permissão para realizar essa operação!");
-		return;
+		return 1;
 	}
 
 	// Gets ID MetaData
@@ -130,31 +132,105 @@ void handle_remove(int auth, MusicMeta *mm, MMHints *hints)
 	hints->pkt_op = MUSIC_DEL;
 	hints->pkt_numres = 1;
 	hints->pkt_status = 0;
+
+	return 0;
 }
 
-void handle_list(int auth, MusicMeta *mm, MMHints *hints)
+int handle_list(int auth, MusicMeta *mm, MMHints *hints)
+{
+	uint16_t filter = 0;
+	int counter = 0, invalid_token = 0;
+	char fields[2048];
+	char tokens[8][256];
+
+	if (!auth) {
+		printf("Você não tem permissão para realizar essa operação!");
+		return 1;
+	}
+
+	// Gets unparsed filter params
+	printf("Os parâmtros disponíveis para filtrar são: id, year, title, interpreter, lang, type, chorus\nDigite aqueles que desejar da forma 'campo=valor', separando-os com ';'\n");
+	fgets((char *) fields, 2048, stdin);
+
+	// Tokenizes filter params
+	for (char *tok = strtok(fields, ";"); tok && *tok; tok = strtok(NULL, ";\n")) {
+		strcpy(tokens[counter++], tok);
+	}
+	
+	// Calculates filter based on present tokens
+	for (int i = 0; i < counter; i++) {
+		char *info = strtok(tokens[i], "=");
+		if(strcmp(info, "id") == 0){
+			mm->id = atoi(strtok(NULL, "=\n"));
+			filter |= (1 << 0);
+		}
+		else if(strcmp(info, "year") == 0){
+			mm->release_year = atoi(strtok(NULL, "=\n"));
+			filter |= (1 << 1);
+		}
+		else if(strcmp(info, "title") == 0){
+			strcpy((char *) mm->title, strtok(NULL, "=\n"));
+			filter |= (1 << 2);
+		}
+		else if(strcmp(info, "interpreter") == 0){
+			strcpy((char *) mm->interpreter, strtok(NULL, "=\n"));
+			filter |= (1 << 3);
+		}
+		else if(strcmp(info, "lang") == 0){
+			strcpy((char *) mm->language, strtok(NULL, "=\n"));
+			filter |= (1 << 4);
+		}
+		else if(strcmp(info, "type") == 0){
+			strcpy((char *) mm->category, strtok(NULL, "=\n"));
+			filter |= (1 << 5);
+		}
+		else if(strcmp(info, "chorus") == 0){
+			strcpy((char *) mm->chorus, strtok(NULL, "=\n"));
+			filter |= (1 << 6);
+		}
+		else if (strcmp(info, "\n") == 0) {
+			
+		}
+		else{
+			invalid_token = 1;
+			printf("Parâmetro '%s' não identificado.\n", info);
+		}
+	}
+
+	// Sets up pkt hints
+	hints->pkt_filter = filter;
+	hints->pkt_op = MUSIC_LIST;
+	hints->pkt_numres = 1;
+	hints->pkt_status = 0;
+
+	return invalid_token;
+}
+
+int handle_download(int auth, MusicMeta *mm, MMHints *hints)
 {
 	if (!auth) {
 		printf("Você não tem permissão para realizar essa operação!");
-		return;
+		return 1;
 	}
+
+	printf("ID: ");
+	scanf(" %d", &mm->id);
+
+	hints->pkt_filter = 0;
+	hints->pkt_op = MUSIC_GET;
+	hints->pkt_numres = 1;
+	hints->pkt_status = 0;
+
+	return 0;
 }
 
-void handle_download(int auth, MusicMeta *mm, MMHints *hints)
-{
-	if (!auth) {
-		printf("Você não tem permissão para realizar essa operação!");
-		return;
-	}
-}
-
-void handle_exit(int auth, MusicMeta *mm, MMHints *hints)
+int handle_exit(int auth, MusicMeta *mm, MMHints *hints)
 {
 	char confirm[3];
 
 	if (!auth) {
 		printf("Você não tem permissão para realizar essa operação!");
-		return;
+		return 1;
 	}
 
 	// Exit Confirmation
@@ -162,63 +238,144 @@ void handle_exit(int auth, MusicMeta *mm, MMHints *hints)
 	scanf("%s", confirm);
 
 	// Sets up exit pkt
-	if(strcmp(confirm, "y") == 0){
-		hints->pkt_op = MUSIC_CLOSE;
-		hints->pkt_numres = 1;
-		hints->pkt_status = 0;
-		hints->pkt_type = MUSIC_END;
-	}
+	hints->pkt_op = MUSIC_CLOSE;
+	hints->pkt_numres = 1;
+	hints->pkt_status = 0;
+	hints->pkt_type = MUSIC_END;
+
+	if(strcmp(confirm, "n") == 0) return 1;
+	return 0;
 }
 
-void handle_operation(char *op, int auth)
+MusicMeta * talk_tcp(MusicMeta *mm, MMHints *hints, int fd)
 {
-	int i;
-	char operations[] = {"add", "rem", "list", "download", "exit"};
-	MusicMeta meta;
-    MMHints  meta_hints;
+	int len;
+	uint16_t *buff;
+	uint16_t response_buff[65000];
+	MusicMeta *server_res;
+
+	buff = htonmm(mm, hints); // FIXME: list with no filter causes malloc error after op
+	len = (int) hints->pkt_size;
+	sendall(fd, buff, &len);
+
+
+	printf("waiting response\n");
+	recvall(fd, response_buff, 650000, 0);
+	server_res = ntohmm(response_buff, hints);
+
+	free(buff);
+
+	if (hints->pkt_type == MUSIC_RES) {
+		printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
+	}
+
+	return server_res;
+}
+
+void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
+{	
+	int len;
+	uint16_t *buff;
+
+	buff = htonmm(mm, hints);
+	len = (int) hints->pkt_size;
+
+	// FIXME: should be sendall
+	if (sendto(fd, buff, len, 0, p->ai_addr, p->ai_addrlen) == -1) {
+		perror("failed to send udp pkt");
+		exit(1);
+	}
+	
+	return;
+}
+
+void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo *p)
+{
+	int i, error;
+	char operations[][10] = {"add", "rem", "list", "download", "exit"};
+	MusicMeta mm;
+    MMHints hints;
+	MusicMeta *response;
 
 	for (i = 0; i < 5; i++) {
 		if (strcmp(op, operations[i]) == 0) break;
 	}
 
+	memset(&mm, 0, sizeof(MusicMeta));
+	memset(&hints, 0, sizeof(MMHints));
+	
 	switch (i)
 	{
 	case 0:
-		handle_add(auth, &meta, &meta_hints);
+		error = handle_add(auth, &mm, &hints);
+		if (error) return;
+		response = talk_tcp(&mm, &hints, tcpfd);
 		break;
 	case 1:
-		handle_remove(auth, &meta, &meta_hints);
+		error = handle_remove(auth, &mm, &hints);
+		if (error) return;
+		response = talk_tcp(&mm, &hints, tcpfd);
+
+		if(hints.pkt_status != MUSIC_OK){
+			printf("\nNenhuma música com este id\n");
+		}
+
 		break;
 	case 2:
-		handle_list(1, &meta, &meta_hints);
+		error = handle_list(1, &mm, &hints);
+		if (error) return;
+		response = talk_tcp(&mm, &hints, tcpfd);
+
+		if (hints.pkt_type == MUSIC_RES) {
+
+			if (hints.pkt_numres == 0)
+				printf("Nenhuma música com essas carcterísticas encontrada!\n");
+			else
+				printf("Listando músicas com as características desejadas!\n");
+
+
+			for (int i = 0; i < hints.pkt_numres; i++) {
+				printf("\t%d, %d, %s, %s, %s, %s, %s\n",
+					response[i].id,
+					response[i].release_year,
+					response[i].title,
+					response[i].interpreter,
+					response[i].language,
+					response[i].category,
+					response[i].chorus
+				);
+			}
+		}
+		
 		break;
 	case 3:
-		handle_download(1, &meta, &meta_hints);
+		error = handle_download(1, &mm, &hints);
+		if (error) return;
+		talk_udp(&mm, &hints, udpfd, p);
 		break;
 	case 4:
-		handle_exit(1, &meta, &meta_hints);
+		error = handle_exit(1, &mm, &hints);
+		if (error) return;
+		talk_tcp(&mm, &hints, tcpfd);
+
+		if (hints.pkt_status == MUSIC_OK) {
+			exit(0);
+		}
+
 		break;
 	default:
 		printf("Operação não suportada. Tente novamente\n");
 		return;
 	}
-
-	// Generates and sends pkt
-
 }
 
 int main(int argc, char *argv[])
 {
 	int sockfd, downloadfd;  
 	struct addrinfo hints, *p;
-    MusicMeta meta;
-    MMHints  meta_hints;
-    uint16_t *buff;
-	uint16_t response_buff[650000];
 	char op[10];
 	char clear_line[128];
-	int len;
-	int auth, state = 0; // Waiting Input == 0 : Waiting Response = 1
+	int auth;
 
 	if (argc < 2) {
 	    fprintf(stderr,"usage: client hostname\n");
@@ -239,237 +396,15 @@ int main(int argc, char *argv[])
 	downloadfd = create_socket(argv[1], PORT, hints, &p);
 
 	// Handles user input
-	printf("%d\n", state);
 	auth = argc > 2 && strcmp(argv[2], "-adm") == 0 ? 1 : 0;
 	greet_prompt(auth);
 
-	while (meta_hints.pkt_type != MUSIC_END){
-		if (state == 0) {
-			state = 1;
-
-			printf("Digite a operação: ");
-			scanf(" %s", op);
-			fgets(clear_line, 128, stdin);
-
-			handle_operation(op, auth);
-
-			// handle input
-		} else {
-			// await responde
-		}
+	while (1){
 		printf("Digite a operação: ");
 		scanf(" %s", op);
 		fgets(clear_line, 128, stdin);
 
-		if(strcmp(op, "add") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
-			meta.id = 0; // placeholder - true id decided by server
-
-			//add musica
-			printf("\n Título: ");
-			fgets((char *) &meta.title, 128, stdin);
-			meta.title[strcspn((char *) meta.title, "\n")] = 0;
-
-			printf("\n Intérprete: ");
-			fgets((char *) &meta.interpreter, 128, stdin);
-			meta.interpreter[strcspn((char *) meta.interpreter, "\n")] = 0;
-
-			printf("\n Idioma: ");
-			fgets((char *) &meta.language, 128, stdin);
-			meta.language[strcspn((char *) meta.language, "\n")] = 0;
-
-			printf("\n Tipo de música: ");
-			fgets((char *) &meta.category, 128, stdin);
-			meta.category[strcspn((char *) meta.category, "\n")] = 0;
-
-			printf("\n Refrão: ");
-			fgets((char *) &meta.chorus, 128, stdin);
-			meta.chorus[strcspn((char *) meta.chorus, "\n")] = 0;
-
-			printf("\n Ano de Lançamento: ");
-			scanf(" %d", &meta.release_year);
-
-			meta_hints.pkt_filter = 0;
-    		meta_hints.pkt_op = MUSIC_ADD;
-    		meta_hints.pkt_numres = 1;
-    		meta_hints.pkt_status = 0;
-			buff = htonmm(&meta, &meta_hints);
-    		len = (int) meta_hints.pkt_size;
-    		sendall(sockfd, buff, &len);
-    
-			printf("waiting response\n");
-			recvall(sockfd, response_buff, 650000, 0);
-			ntohmm(response_buff, &meta_hints);
-
-			if (meta_hints.pkt_type == MUSIC_RES) {
-				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-			}
-		}
-
-		 else if(strcmp(op, "rem") == 0 && argc>2 && strcmp(argv[2], "-adm")==0){
-			printf("\n ID: ");
-			scanf(" %d", &meta.id);
-
-			meta_hints.pkt_filter = 0;
-    		meta_hints.pkt_op = MUSIC_DEL;
-    		meta_hints.pkt_numres = 1;
-    		meta_hints.pkt_status = 0;
-
-			buff = htonmm(&meta, &meta_hints);
-    		len = (int) meta_hints.pkt_size;
-    		sendall(sockfd, buff, &len);
-
-			printf("waiting response\n");
-			recvall(sockfd, response_buff, 2048, 0);
-			ntohmm(response_buff, &meta_hints);
-
-			if(meta_hints.pkt_status != MUSIC_OK){
-				printf("\nNenhuma música com este id\n");
-			}
-
-			if (meta_hints.pkt_type == MUSIC_RES) {
-				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-			}
-		}
-
-		else if(strcmp(op, "list") == 0){
-			char fields[2048];
-			printf("Os parâmtros disponíveis para filtrar são: id, year, title, interpreter, lang, type, chorus\nDigite aqueles que desejar da forma 'campo=valor', separando-os com ';'\n");
-			fgets((char *) fields, 2048, stdin);
-
-			MusicMeta *server_res;
-			uint16_t filter = 0;
-			int counter = 0;
-			int not_identified = 0;
-			char **tokens = (char **) malloc(sizeof(char *) * 8);
-
-			for (char *tok = strtok(fields, ";"); tok && *tok; tok = strtok(NULL, ";\n")) {
-				tokens[counter] = malloc(sizeof(char) * 128);
-				strcpy(tokens[counter], tok);
-				counter++;
-			}
-
-			memset(&meta, 0, sizeof(MusicMeta));
-			for (int i = 0; i < counter; i++) {
-				char *info = strtok(tokens[i], "=");
-				if(strcmp(info, "id") == 0){
-					meta.id = atoi(strtok(NULL, "=\n"));
-					filter |= (1 << 0);
-				}
-				else if(strcmp(info, "year") == 0){
-					meta.release_year = atoi(strtok(NULL, "=\n"));
-					filter |= (1 << 1);
-				}
-				else if(strcmp(info, "title") == 0){
-					strcpy((char *) meta.title, strtok(NULL, "=\n"));
-					filter |= (1 << 2);
-				}
-				else if(strcmp(info, "interpreter") == 0){
-					strcpy((char *) meta.interpreter, strtok(NULL, "=\n"));
-					filter |= (1 << 3);
-				}
-				else if(strcmp(info, "lang") == 0){
-					strcpy((char *) meta.language, strtok(NULL, "=\n"));
-					filter |= (1 << 4);
-				}
-				else if(strcmp(info, "type") == 0){
-					strcpy((char *) meta.category, strtok(NULL, "=\n"));
-					filter |= (1 << 5);
-				}
-				else if(strcmp(info, "chorus") == 0){
-					strcpy((char *) meta.chorus, strtok(NULL, "=\n"));
-					filter |= (1 << 6);
-				}
-				else if (strcmp(info, "\n") == 0) {
-					
-				}
-				else{
-					not_identified = 1;
-					printf("Parâmetro '%s' não identificado.\n", info);
-				}
-        	}
-
-			if (!not_identified) {
-				printf("searching with filter %d\n", filter);
-				meta_hints.pkt_filter = filter;
-				meta_hints.pkt_op = MUSIC_LIST;
-				meta_hints.pkt_numres = 1;
-				meta_hints.pkt_status = 0;
-				
-				buff = htonmm(&meta, &meta_hints);
-				len = (int) meta_hints.pkt_size;
-
-				sendall(sockfd, buff, &len);
-				printf("waiting response\n");
-				recvall(sockfd, response_buff, 2048, 0);
-				server_res = ntohmm(response_buff, &meta_hints);
-		
-				if (meta_hints.pkt_type == MUSIC_RES) {
-					printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-					printf("listing musics with matching fields\n");
-
-					if(meta_hints.pkt_numres == 0){
-						printf("\nNenhuma música com essas carcterísticas encontrada!\n");
-					}
-
-					for (int i = 0; i < meta_hints.pkt_numres; i++) {
-						printf("\t%d, %d, %s, %s, %s, %s, %s\n",
-							server_res[i].id,
-							server_res[i].release_year,
-							server_res[i].title,
-							server_res[i].interpreter,
-							server_res[i].language,
-							server_res[i].category,
-							server_res[i].chorus
-						);
-					}
-				}
-			}
-		}
-		else if (strcmp(op, "download") == 0) {
-			printf("ID: ");
-			scanf(" %d", &meta.id);
-
-			meta_hints.pkt_filter = 0;
-    		meta_hints.pkt_op = MUSIC_GET;
-    		meta_hints.pkt_numres = 1;
-    		meta_hints.pkt_status = 0;
-
-			buff = htonmm(&meta, &meta_hints);
-    		len = (int) meta_hints.pkt_size;
-
-			if (sendto(downloadfd, buff, len, 0, p->ai_addr, p->ai_addrlen) == -1) {
-				perror("failed to send udp pkt");
-				exit(1);
-			}
-			
-		}
-		else if(strcmp(op, "exit") == 0){
-			char confirm[3];
-			printf("Deseja sair? (y/n): ");
-			scanf("%s", confirm);
-			if(strcmp(confirm, "y") == 0){
-				meta_hints.pkt_op = MUSIC_CLOSE;
-    			meta_hints.pkt_numres = 1;
-    			meta_hints.pkt_status = 0;
-				meta_hints.pkt_type = MUSIC_END;
-
-				buff = htonmm(&meta, &meta_hints);
-				len = (int) meta_hints.pkt_size;
-				sendall(sockfd, buff, &len);
-
-				printf("waiting response\n");
-				recvall(sockfd, response_buff, 2048, 0);
-				ntohmm(response_buff, &meta_hints);
-				printf("server responded op %d with status %d\n", meta_hints.pkt_op, meta_hints.pkt_status);
-
-				if (meta_hints.pkt_status != MUSIC_OK) {
-					meta_hints.pkt_type = MUSIC_ADD; // will be overwritten in next iter
-				}
-			}
-		}
-		else{
-			printf("Operação não suportada ou reservada para administradores, tente novamente\n");
-		}
+		handle_operation(op, auth, sockfd, downloadfd, p);
 	}
 
 	close(sockfd);
