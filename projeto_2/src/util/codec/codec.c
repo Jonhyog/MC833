@@ -142,7 +142,7 @@ MusicMeta* ntohmm(uint16_t* pkt, MMHints *hints)
     hints->pkt_filter = (pkt[2] & 0b0000000011111111);
     hints->pkt_numres = (pkt[2] & 0b1111111100000000) >> 8;
 
-    mm = (MusicMeta *) calloc(hints->pkt_numres, sizeof(sizeof(MusicMeta)));
+    mm = (MusicMeta *) calloc(hints->pkt_numres, sizeof(MusicMeta));
 
     // unpacks offset table section
     uint16_t *offsets = (uint16_t *) calloc(8 * hints->pkt_numres, sizeof(uint16_t));
@@ -153,16 +153,6 @@ MusicMeta* ntohmm(uint16_t* pkt, MMHints *hints)
     uint16_t off = 0;
     for (int i = 0; i < hints->pkt_numres; i++) {
         // secoff, idoff, rloff, ttoff, itoff, lgoff, ctoff, choff
-        uint16_t fields_offsets[] = {
-            offsets[off + 0],
-            offsets[off + 1],
-            offsets[off + 2],
-            offsets[off + 3],
-            offsets[off + 4],
-            offsets[off + 5],
-            offsets[off + 6],
-            offsets[off + 7],
-        };
         unsigned char *fields_values[] = {
             NULL,
             NULL,
@@ -174,15 +164,15 @@ MusicMeta* ntohmm(uint16_t* pkt, MMHints *hints)
             mm[i].chorus
         };
 
-        // moves pointer to next result offsets
-        off += 8;
-
         // copies integer fields
-        mm[i].id           = pkt[fields_offsets[0] + fields_offsets[1]];
-        mm[i].release_year = pkt[fields_offsets[0] + fields_offsets[2]];
+        mm[i].id           = pkt[offsets[off] + offsets[off + 1]];
+        mm[i].release_year = pkt[offsets[off] + offsets[off + 2]];
 
         // copies string fields
-        for (uint16_t j = 3; j < 8; j++) read2char(fields_offsets[0] + fields_offsets[j], pkt, fields_values[j]);
+        for (int j = 3; j < 8; j++) read2char(offsets[off] + offsets[off + j], pkt, fields_values[j]);
+
+        // moves pointer to next result offsets
+        off += 8;
     }
 
     return mm;

@@ -367,6 +367,8 @@ void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo 
 		printf("Operação não suportada. Tente novamente\n");
 		return;
 	}
+
+	free(response);
 }
 
 int main(int argc, char *argv[])
