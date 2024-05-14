@@ -134,6 +134,19 @@ int rmv_music(MusicLib *ml, int id)
     return 0;
 }
 
+char* download_music(MusicLib *ml, int id)
+{
+    int pos = -1;
+
+	for (int i = 0; i < ml->size; i++) {
+		if (ml->musics[i].meta.id == id) {
+			return ml->musics[i].meta.fpath;
+		}
+	}
+    return '';
+	
+}
+
 int compare_field(MusicMeta *a, MusicMeta *b, int filter)
 {
     int res = 1;

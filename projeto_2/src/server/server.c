@@ -247,6 +247,43 @@ void service_loop(int fd, MusicLib *db)
     }
 }
 
+int file_size(FILE *file){
+	fseek(file, 0L, SEEK_END);
+	int size = ftell(file);
+	rewind(file);
+	return size;
+}
+
+char *header(int c){
+	int header_size = 10; //????????
+	char *str;
+	for(int i=0;i<strlen(str) - header_size;i++){
+		str[i] = '';
+	}
+	strcat(str, c + '0');
+	return str;
+}
+
+int send_song(char *filename, int sockfd, const struct sockaddr *to, socklen_t *tolen){
+	FILE *file;
+	int max_size = 10000 //???????????????
+	file = fopen(filename,"rb");
+	int count = file_size(file)/max_size;
+	char *header_count = header(count);
+	int i = 0;
+	for (i=0;i<count;i++){
+		char *buf;
+		char *file_chunk;
+		strcpy(buf, header_count);
+		strcat(buf, header(i));
+		fread(&file_chunk, 1, max_size,file);
+		strcat(buf, file_chunk);
+		sendto(sockfd, buf, max_size + 20, 0, to, tolen); 
+	}
+	fclose(file);
+	
+}
+
 int main(int argc, char *argv[])
 {
 	int sockfd, new_fd, downloadfd, maxfdp1;  // listen on sock_fd, new connection on new_fd
@@ -362,6 +399,16 @@ int main(int argc, char *argv[])
 
 			if (hints.pkt_op == MUSIC_GET) {
 				printf("server: sending file for music %d\n", mm->id);
+				char *filename = download_music(db, mm->id)
+				if(strcmp(filename, '')){
+					hints.pkt_status = MUSIC_ERR;
+				}
+				else{
+					hints.pkt_status = MUSIC_OK;
+				}	
+				hints.pkt_numres = 0;
+				send_song(filename, downloadfd, their_addr, sin_size);
+				
 			} else {
 				perror("server: operation is not supported via UDP\n");
 

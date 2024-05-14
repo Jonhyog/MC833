@@ -285,7 +285,18 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 		perror("failed to send udp pkt");
 		exit(1);
 	}
-	
+	printf("waiting response\n");
+
+	recvfrom(fd, buff, 65000, 0,p->ai_addr, p->ai_addrlen);
+	//pega o tamanho total e itera
+	//vai colocando em ordem
+	server_res = ntohmm(response_buff, hints);
+
+	free(buff);
+
+	if (hints->pkt_type == MUSIC_RES) {
+		printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
+	}
 	return;
 }
 
