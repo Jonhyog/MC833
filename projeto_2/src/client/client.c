@@ -274,8 +274,12 @@ MusicMeta * talk_tcp(MusicMeta *mm, MMHints *hints, int fd)
 
 void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 {	
-	int len;
+	struct sockaddr_storage their_addr; // connector's address information
+	socklen_t sin_size;
+	int len, count;
 	uint16_t *buff;
+	uint16_t frag, total;
+	uint16_t res[1024 * 1024];
 
 	buff = htonmm(mm, hints);
 	len = (int) hints->pkt_size;
@@ -287,17 +291,37 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 	}
 	printf("waiting response\n");
 
-	recvfrom(fd, buff, 65000, 0,p->ai_addr, p->ai_addrlen);
-	//pega o tamanho total e itera
-	//vai colocando em ordem
-	server_res = ntohmm(response_buff, hints);
-
 	free(buff);
 
-	if (hints->pkt_type == MUSIC_RES) {
-		printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
+	count = 0;
+	total = 0;
+	int n;
+	while (1) {
+		if ((n = recvfrom(fd, res, (4 + FRAG_SIZE) * 2, 0, (struct sockaddr *) &their_addr, &sin_size)) == -1) {
+			perror("recvfrom");
+			exit(1);
+		}
+		frag = ntohs(res[3]) & 0b0000000011111111;
+		total = (ntohs(res[3]) & 0b1111111100000000) >> 8;
+
+		printf("client: received fragment %d/%d in %d bytes!\n", frag, total, n);
+		count++;
+
+		if (count >= total)
+			break;
 	}
-	return;
+
+	// recvfrom(fd, buff, 65000, 0,p->ai_addr, p->ai_addrlen);
+	//pega o tamanho total e itera
+	//vai colocando em ordem
+	// server_res = ntohmm(response_buff, hints);
+
+
+	// if (hints->pkt_type == MUSIC_RES) {
+	// 	printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
+	// }
+
+	// return;
 }
 
 void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo *p)

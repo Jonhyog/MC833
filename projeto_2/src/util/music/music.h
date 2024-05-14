@@ -40,7 +40,8 @@ void msc_copy(MusicData *a, MusicData *b);
 
 void add_music(MusicLib *ml, MusicData *md);
 int rmv_music(MusicLib *ml, int id);
-int download_music(MusicLib *ml, int id);
+char* download_music(MusicLib *ml, int id);
+void get_music_name(char *dest, MusicLib *ml, int id);
 MusicMeta * get_meta(MusicLib *ml, MusicMeta *mm, int filter, int *res_size);
 
 #endif

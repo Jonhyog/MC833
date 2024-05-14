@@ -247,41 +247,77 @@ void service_loop(int fd, MusicLib *db)
     }
 }
 
-int file_size(FILE *file){
-	fseek(file, 0L, SEEK_END);
-	int size = ftell(file);
-	rewind(file);
-	return size;
-}
+// int file_size(FILE *file){
+// 	fseek(file, 0L, SEEK_END);
+// 	int size = ftell(file);
+// 	rewind(file);
+// 	return size;
+// }
 
-char *header(int c){
-	int header_size = 10; //????????
-	char *str;
-	for(int i=0;i<strlen(str) - header_size;i++){
-		str[i] = '';
-	}
-	strcat(str, c + '0');
-	return str;
-}
-
-int send_song(char *filename, int sockfd, const struct sockaddr *to, socklen_t *tolen){
-	FILE *file;
-	int max_size = 10000 //???????????????
-	file = fopen(filename,"rb");
-	int count = file_size(file)/max_size;
-	char *header_count = header(count);
-	int i = 0;
-	for (i=0;i<count;i++){
-		char *buf;
-		char *file_chunk;
-		strcpy(buf, header_count);
-		strcat(buf, header(i));
-		fread(&file_chunk, 1, max_size,file);
-		strcat(buf, file_chunk);
-		sendto(sockfd, buf, max_size + 20, 0, to, tolen); 
-	}
-	fclose(file);
+// char *header(int c){
+// 	int header_size = 10; //????????
+// 	char *str;
+// 	for(int i=0;i<strlen(str) - header_size;i++){
+// 		str[i] = ' ';
+// 	}
+// 	strcat(str, c + '0');
+// 	return str;
+// }
+// 
+// int send_song(char *filename, int sockfd, const struct sockaddr *to, socklen_t *tolen){
+// 	FILE *file;
+// 	int max_size = 10000; //???????????????
+// 	file = fopen(filename,"rb");
+// 	int count = file_size(file)/max_size;
+// 	char *header_count = header(count);
+// 	int i = 0;
+// 	for (i=0;i<count;i++){
+// 		char *buf;
+// 		char *file_chunk;
+// 		strcpy(buf, header_count);
+// 		strcat(buf, header(i));
+// 		fread(&file_chunk, 1, max_size,file);
+// 		strcat(buf, file_chunk);
+// 		sendto(sockfd, buf, max_size + 20, 0, to, tolen); 
+// 	}
+// 	fclose(file);
 	
+// }
+
+void send_song(char *fname, int sockfd, struct sockaddr *to, socklen_t *tolen)
+{
+	FILE *file;
+	uint16_t **pkts;
+	MMHints hints;
+	int frags;
+
+	file = fopen(fname, "rb");
+
+	int size;
+
+	fseek(file, 0L, SEEK_END);
+	size = ftell(file);
+	rewind(file);
+
+	printf("server: got fd %p for file\n", file);
+	printf("server: file has %d bytes\n", size);
+
+	// sets response hints and creates pkts
+	hints.pkt_op = MUSIC_GET;
+	hints.pkt_type = MUSIC_RES;
+	hints.pkt_status = MUSIC_OK;
+	hints.pkt_filter = 0;
+	hints.pkt_numres = 0;
+	pkts = htonmd(file, &hints, &frags);
+
+	printf("server: sending %d fragments to client\n", frags);
+	// sends all fragments
+	for (int i = 0; i < frags; i++) {
+		printf("\rserver: sending fragment %d", i);
+		fflush(stdout);
+		sendto(sockfd, pkts[i], (4 + FRAG_SIZE) * 2, 0, to, *tolen);
+	}
+	printf("\n");
 }
 
 int main(int argc, char *argv[])
@@ -385,11 +421,12 @@ int main(int argc, char *argv[])
 
 		// UDP Service Loop
 		if (FD_ISSET(downloadfd, &rset)) {
+			// char music_name[128];
 			uint16_t buff[1000];
 			MusicMeta *mm;
     		MMHints hints;
 			sin_size = sizeof their_addr;
-			int n = recvfrom(downloadfd, buff, 1000, 0, (struct sockaddr *) s, &sin_size);
+			int n = recvfrom(downloadfd, buff, 1000, 0, (struct sockaddr *) &their_addr, &sin_size);
 
 			printf("server: received %d bytes using UDP!\n", n);
 
@@ -399,15 +436,18 @@ int main(int argc, char *argv[])
 
 			if (hints.pkt_op == MUSIC_GET) {
 				printf("server: sending file for music %d\n", mm->id);
-				char *filename = download_music(db, mm->id)
-				if(strcmp(filename, '')){
-					hints.pkt_status = MUSIC_ERR;
-				}
-				else{
-					hints.pkt_status = MUSIC_OK;
-				}	
-				hints.pkt_numres = 0;
-				send_song(filename, downloadfd, their_addr, sin_size);
+				// get_music_name(music_name, db, mm->id);
+				send_song("songs/test.mp3", downloadfd, (struct sockaddr *) &their_addr, &sin_size);
+
+				// char *filename = download_music(db, mm->id);
+				// if(strcmp(filename, "")){
+				// 	hints.pkt_status = MUSIC_ERR;
+				// }
+				// else{
+				// 	hints.pkt_status = MUSIC_OK;
+				// }	
+				// hints.pkt_numres = 0;
+				// send_song(filename, downloadfd, &their_addr, sin_size);
 				
 			} else {
 				perror("server: operation is not supported via UDP\n");

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -7,6 +8,7 @@
 #include "codec.h"
 
 #define BITPACK(A, B) ((A - 1) | (B - 1)) + 1
+#define MIN(A, B) A <= B ? A : B
 
 void write2int16(uint16_t start, unsigned char *data, uint16_t *dest)
 {
@@ -176,6 +178,110 @@ MusicMeta* ntohmm(uint16_t* pkt, MMHints *hints)
     }
 
     return mm;
+}
+
+int file_size(FILE *file)
+{
+    int size;
+
+	fseek(file, 0L, SEEK_END);
+	size = ftell(file);
+	rewind(file);
+
+	return size;
+}
+
+int read_file(FILE *fd, uint16_t *buff)
+{
+    // FIXME: increse maximum music size
+    int size = fread(buff, sizeof(uint16_t), 1024 * 1024, fd);
+    fclose(fd);
+
+    return size;
+}
+
+uint16_t** htonmd(FILE *md, MMHints *hints, int *frags)
+{
+    uint16_t buff[1024 * 1024];
+    uint16_t **pkt;
+    int total_size, num_frags;
+    uint16_t file_idx;
+
+    // Reads file and calculates num of
+    // fragments to send over udp
+    total_size = read_file(md, buff);
+    num_frags = total_size / FRAG_SIZE + 1;
+    // printf("Music Total size %d\n", total_size);
+    // printf("Music Fragments %d\n", num_frags);
+
+    // Allocates memory for all fragments (with headers included)
+    pkt = (uint16_t **) calloc(num_frags, sizeof(uint16_t *));
+    for (int i = 0; i < num_frags; i++) {
+        // size(pkt[i]) = 
+        //              = (pkt_size + h1 + h2 + h3) + FRAG_SIZE
+        //              = 6 + FRAG_SIZE
+        // We use FRAG_SIZE / 2 because FRAG_SIZE is in bytes and uint16 == 2 bytes
+        pkt[i] = (uint16_t *) calloc(4 + FRAG_SIZE, sizeof(uint16_t));
+    }
+
+    // Assembles udp pkts
+    file_idx = 0;
+    for (int i = 0; i < num_frags; i++) {
+        pkt[i][0] = MIN(total_size, FRAG_SIZE) + 4;
+        pkt[i][1] = hints->pkt_type | (hints->pkt_op << 4) | (hints->pkt_status << 8);
+        pkt[i][2] = hints->pkt_filter | (hints->pkt_numres << 8);
+        pkt[i][3] = i | (num_frags << 8);
+        // FIX-ME: total_frag and curr_frag should be 16 bit
+
+        total_size -= FRAG_SIZE;
+
+        // Copies music data to pkt
+        for (int j = 0; j < pkt[i][0]; j++) pkt[i][j + 4] = buff[file_idx++];
+    }
+
+    // Rewrites pkt with network byte order
+    for (int i = 0; i < num_frags; i++) {
+        for (int j = 0; j < 4 + FRAG_SIZE; j++) {
+            pkt[i][j] = htons(pkt[i][j]);
+        }
+    }
+
+    *(frags) = num_frags;
+    return pkt;
+}
+
+uint16_t* ntohmd(uint16_t** pkt, MMHints *hints)
+{
+    uint16_t *buff = (uint16_t *) calloc(65536, sizeof(uint16_t));
+    uint16_t num_frags = (pkt[0][3] & 0b1111111100000000) >> 8;
+    uint16_t file_idx;
+
+    // Rewrites pkt with host byte order
+    for (int i = 0; i < num_frags; i++) {
+        for (int j = 0; j < 4 + FRAG_SIZE; j++) {
+            pkt[i][j] = ntohs(pkt[i][j]);
+        }
+    }
+
+    // finishes unpacking header
+    hints->pkt_type   = (pkt[0][1] & 0b0000000000001111);
+    hints->pkt_op     = (pkt[0][1] & 0b0000000011110000) >> 4;
+    hints->pkt_status = (pkt[0][1] & 0b1111111100000000) >> 8;
+
+    hints->pkt_filter = (pkt[0][2] & 0b0000000011111111);
+    hints->pkt_numres = (pkt[0][2] & 0b1111111100000000) >> 8;
+
+    // TODO: Reorder pkts
+
+    // Copies Music Data
+    file_idx = 0;
+    for (int i = 0; i < num_frags; i++) {
+        for (int j = 0; j < pkt[i][0]; j++) {
+            buff[file_idx++] = pkt[i][j + 4];
+        }
+    }
+
+    return buff;
 }
 
 void recvall(int fd, uint16_t *buff, int buff_size, int flags)

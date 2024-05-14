@@ -6,6 +6,7 @@
 #include "music.h"
 
 #define HEADER_SIZE 12
+#define FRAG_SIZE 8192
 
 // pkt_ops
 #define MUSIC_ADD  0b00
@@ -54,9 +55,12 @@ typedef struct {
 } MMHints;
 
 uint16_t* htonmm(MusicMeta *mm, MMHints *hints);
+uint16_t** htonmd(FILE *md, MMHints *hints, int *frags);
+
 // unsigned char* htonmd(MusicData md);
 
 MusicMeta* ntohmm(uint16_t* pkt, MMHints *hints);
+uint16_t* ntohmd(uint16_t** pkt, MMHints *hints);
 // MusicMeta* ntohmd(unsigned char* pkt);
 
 void recvall(int fd, uint16_t *buff, int buff_size, int flags);

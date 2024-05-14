@@ -136,15 +136,28 @@ int rmv_music(MusicLib *ml, int id)
 
 char* download_music(MusicLib *ml, int id)
 {
-    int pos = -1;
-
 	for (int i = 0; i < ml->size; i++) {
 		if (ml->musics[i].meta.id == id) {
-			return ml->musics[i].meta.fpath;
+			return (char *) ml->musics[i].meta.fpath;
 		}
 	}
-    return '';
-	
+
+    return "";
+}
+
+void get_music_name(char *dest, MusicLib *ml, int id)
+{
+    strcpy(dest, "");
+
+    for (int i = 0; i < ml->size; i++) {
+		if (ml->musics[i].meta.id == id) {
+	        printf("AQUI!\n");
+            strcpy(dest, (char *) ml->musics[i].meta.fpath);
+			return;
+		}
+	}
+
+    return;
 }
 
 int compare_field(MusicMeta *a, MusicMeta *b, int filter)
