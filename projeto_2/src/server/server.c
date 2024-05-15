@@ -256,15 +256,6 @@ void send_song(char *fname, int sockfd, struct sockaddr *to, socklen_t *tolen)
 
 	file = fopen(fname, "rb");
 
-	int size;
-
-	fseek(file, 0L, SEEK_END);
-	size = ftell(file);
-	rewind(file);
-
-	printf("server: got fd %p for file\n", file);
-	printf("server: file has %d bytes\n", size);
-
 	// sets response hints and creates pkts
 	hints.pkt_op = MUSIC_GET;
 	hints.pkt_type = MUSIC_RES;
@@ -278,7 +269,9 @@ void send_song(char *fname, int sockfd, struct sockaddr *to, socklen_t *tolen)
 	for (int i = 0; i < frags; i++) {
 		printf("\rserver: sending fragment %d", i);
 		fflush(stdout);
-		sendto(sockfd, pkts[i], (4 + FRAG_SIZE) * 2, 0, to, *tolen);
+		sendto(sockfd, pkts[i], UDP_SIZE * 2, 0, to, *tolen);
+		usleep(100);
+
 	}
 	printf("\n");
 }

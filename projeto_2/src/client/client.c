@@ -306,7 +306,7 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 
 	// Sets timeout
 	timeout.tv_sec = 0;
-	timeout.tv_usec = 500000;
+	timeout.tv_usec = 3000000;
 
 	// Receives music data
 	count = 0;
@@ -327,7 +327,7 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 		}
 
 		if (ret == 0) {
-			printf("\nclient: download timedout\n");
+			printf("\nclient: download timedout");
 			break;
 		}
 		if ((n = recvfrom(fd, temp, UDP_SIZE * 2, 0, (struct sockaddr *) &their_addr, &sin_size)) == -1) {
@@ -350,9 +350,20 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 			break;
 	}
 
+	printf("\n");
+
+	FILE *fptr;
+	uint16_t *music = ntohmd(res, hints, count);
+
+	fptr = fopen("music.mp3", "wb");
+	fwrite(music, sizeof(uint16_t), count * (UDP_SIZE - 5), fptr);
+	fclose(fptr);
+
 	if (hints->pkt_type == MUSIC_RES) {
 		printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
 	}
+
+	free(music);
 }
 
 void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo *p)
