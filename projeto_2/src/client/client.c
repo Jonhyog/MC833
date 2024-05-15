@@ -278,8 +278,13 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 	socklen_t sin_size;
 	int len, count;
 	uint16_t *buff;
-	uint16_t frag, total;
-	uint16_t res[1024 * 1024];
+	uint16_t total;
+	fd_set rset;
+	struct timeval timeout;
+	int n, ret;
+	uint16_t **res;
+	uint16_t temp[UDP_SIZE];
+	// uint16_t res[1024 * 1024];
 
 	buff = htonmm(mm, hints);
 	len = (int) hints->pkt_size;
@@ -293,35 +298,61 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 
 	free(buff);
 
+	// Allocates memory for response pkts;
+	res = (uint16_t **) calloc(65536, sizeof(uint16_t *));
+	for (int i = 0; i < 65536; i++) {
+		res[i] = (uint16_t *) calloc(UDP_SIZE, sizeof(uint16_t));
+	}
+
+	// Sets timeout
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 500000;
+
+	// Receives music data
 	count = 0;
 	total = 0;
-	int n;
+	FD_ZERO(&rset);
 	while (1) {
-		if ((n = recvfrom(fd, res, (4 + FRAG_SIZE) * 2, 0, (struct sockaddr *) &their_addr, &sin_size)) == -1) {
+		FD_SET(fd, &rset);
+
+		ret = select(fd + 1, &rset, NULL, NULL, &timeout);
+
+		if (ret < 0) {
+			if (errno == EINTR)
+				continue;
+			else {
+				perror("select_error");
+				exit(1);
+			}
+		}
+
+		if (ret == 0) {
+			printf("\nclient: download timedout\n");
+			break;
+		}
+		if ((n = recvfrom(fd, temp, UDP_SIZE * 2, 0, (struct sockaddr *) &their_addr, &sin_size)) == -1) {
 			perror("recvfrom");
 			exit(1);
 		}
-		frag = ntohs(res[3]) & 0b0000000011111111;
-		total = (ntohs(res[3]) & 0b1111111100000000) >> 8;
 
-		printf("client: received fragment %d/%d in %d bytes!\n", frag, total, n);
+		for (int i = 0; i < UDP_SIZE; i++) res[count][i] = temp[i];
+
+		// frag = ntohs(res[3]);
+		total = ntohs(res[count][4]);
+
+		printf("\rclient: download: %4d/%4d", count, total);
+		fflush(stdout);
+
+		// printf("client: received fragment %d/%d in %d bytes! (%d)\n", frag, total, n, count);
 		count++;
 
 		if (count >= total)
 			break;
 	}
 
-	// recvfrom(fd, buff, 65000, 0,p->ai_addr, p->ai_addrlen);
-	//pega o tamanho total e itera
-	//vai colocando em ordem
-	// server_res = ntohmm(response_buff, hints);
-
-
-	// if (hints->pkt_type == MUSIC_RES) {
-	// 	printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
-	// }
-
-	// return;
+	if (hints->pkt_type == MUSIC_RES) {
+		printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
+	}
 }
 
 void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo *p)
@@ -330,7 +361,7 @@ void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo 
 	char operations[][10] = {"add", "rem", "list", "download", "exit"};
 	MusicMeta mm;
     MMHints hints;
-	MusicMeta *response;
+	MusicMeta *response = NULL;
 
 	for (i = 0; i < 5; i++) {
 		if (strcmp(op, operations[i]) == 0) break;
@@ -403,7 +434,8 @@ void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo 
 		return;
 	}
 
-	free(response);
+	if (response != NULL)
+		free(response);
 }
 
 int main(int argc, char *argv[])

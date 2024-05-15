@@ -7,6 +7,8 @@
 
 #define HEADER_SIZE 12
 #define FRAG_SIZE 8192
+#define UDP_SIZE 243 // 485 bytes FIX-ME: Revisar htonmd tamanhos dos vetores
+#define MAX_MUSIC_SIZE (UDP_SIZE - 3) * 1024 * 1024
 
 // pkt_ops
 #define MUSIC_ADD  0b00
