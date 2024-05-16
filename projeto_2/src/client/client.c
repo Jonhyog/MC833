@@ -34,7 +34,7 @@ int create_socket(char *addr, char *port, struct addrinfo hints, struct addrinfo
 
 	if ((rv = getaddrinfo(addr, PORT, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
+		exit(1);
 	}
 
 	// loop through all the results and connect to the first we can
@@ -58,7 +58,7 @@ int create_socket(char *addr, char *port, struct addrinfo hints, struct addrinfo
 
 	if (p_temp == NULL) {
 		fprintf(stderr, "client: failed to connect\n");
-		return 2;
+		exit(1);
 	}
 
 	*(p) = p_temp;
@@ -69,9 +69,9 @@ int create_socket(char *addr, char *port, struct addrinfo hints, struct addrinfo
 void greet_prompt(int auth)
 {
 	if (auth)
-		printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\n\nPara sair digite exit\n");
+		printf("Seja bem vindo!\n\nOperações:\nAdd: Adicionar uma música\nRem: Remover uma música pelo ID\nList: Mostrar músicas\nDownload: Baixar musica do servidor\n\nPara sair digite exit\n");
 	else
-		printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
+		printf("Seja bem vindo!\n\nOperações:\nList: Mostrar músicas\nDownload: Baixar musica do servidor\n\nMais operações disponíveis para administradores, adicione a flag -adm\n\nPara sair digite exit\n");
 }
 
 int handle_add(int auth, MusicMeta *mm, MMHints *hints)
@@ -272,30 +272,26 @@ MusicMeta * talk_tcp(MusicMeta *mm, MMHints *hints, int fd)
 	return server_res;
 }
 
-void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
+uint16_t * talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p, int *size)
 {	
 	struct sockaddr_storage their_addr; // connector's address information
 	socklen_t sin_size;
-	int len, count;
-	uint16_t *buff;
-	uint16_t total;
+	int len, count, total;
+	uint16_t *buff, **res;
 	fd_set rset;
 	struct timeval timeout;
 	int n, ret;
-	uint16_t **res;
 	uint16_t temp[UDP_SIZE];
-	// uint16_t res[1024 * 1024];
 
 	buff = htonmm(mm, hints);
 	len = (int) hints->pkt_size;
 
-	// FIXME: should be sendall
+	// no need to use sendall because pkt are always smaller than 508 bytes
 	if (sendto(fd, buff, len, 0, p->ai_addr, p->ai_addrlen) == -1) {
 		perror("failed to send udp pkt");
 		exit(1);
 	}
 	printf("waiting response\n");
-
 	free(buff);
 
 	// Allocates memory for response pkts;
@@ -315,8 +311,8 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 	while (1) {
 		FD_SET(fd, &rset);
 
+		// blocks until rcvs pkt or times out
 		ret = select(fd + 1, &rset, NULL, NULL, &timeout);
-
 		if (ret < 0) {
 			if (errno == EINTR)
 				continue;
@@ -326,24 +322,25 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 			}
 		}
 
+		// checks if there was a timeout
 		if (ret == 0) {
 			printf("\nclient: download timedout");
 			break;
 		}
+
+		// finally rcvs pkt from udp socket
 		if ((n = recvfrom(fd, temp, UDP_SIZE * 2, 0, (struct sockaddr *) &their_addr, &sin_size)) == -1) {
 			perror("recvfrom");
 			exit(1);
 		}
 
+		// cps data from temp buffer to pkt matrix
 		for (int i = 0; i < UDP_SIZE; i++) res[count][i] = temp[i];
 
-		// frag = ntohs(res[3]);
+		// prints download %
 		total = ntohs(res[count][4]);
-
 		printf("\rclient: download: %4d/%4d", count, total);
 		fflush(stdout);
-
-		// printf("client: received fragment %d/%d in %d bytes! (%d)\n", frag, total, n, count);
 		count++;
 
 		if (count >= total)
@@ -351,28 +348,24 @@ void talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p)
 	}
 
 	printf("\n");
-
-	FILE *fptr;
-	uint16_t *music = ntohmd(res, hints, count);
-
-	fptr = fopen("music.mp3", "wb");
-	fwrite(music, sizeof(uint16_t), count * (UDP_SIZE - 5), fptr);
-	fclose(fptr);
-
 	if (hints->pkt_type == MUSIC_RES) {
 		printf("server responded op %d with status %d\n", hints->pkt_op, hints->pkt_status);
 	}
 
-	free(music);
+	*(size) = count;
+	return ntohmd(res, hints, count);
 }
 
 void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo *p)
 {
-	int i, error;
+	int i, error, music_size;
 	char operations[][10] = {"add", "rem", "list", "download", "exit"};
+	char music_name[128];
 	MusicMeta mm;
     MMHints hints;
 	MusicMeta *response = NULL;
+	uint16_t *music;
+	FILE *fptr;
 
 	for (i = 0; i < 5; i++) {
 		if (strcmp(op, operations[i]) == 0) break;
@@ -428,7 +421,12 @@ void handle_operation(char *op, int auth, int tcpfd, int udpfd, struct addrinfo 
 	case 3:
 		error = handle_download(1, &mm, &hints);
 		if (error) return;
-		talk_udp(&mm, &hints, udpfd, p);
+		music = talk_udp(&mm, &hints, udpfd, p, &music_size);
+		sprintf(music_name, "downloads/%d.mp3", mm.id);
+		fptr = fopen(music_name, "wb");
+		fwrite(music, sizeof(uint16_t), music_size * (UDP_SIZE - 5), fptr);
+		fclose(fptr);
+		free(music);
 		break;
 	case 4:
 		error = handle_exit(1, &mm, &hints);

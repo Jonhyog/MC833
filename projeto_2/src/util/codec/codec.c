@@ -44,7 +44,7 @@ uint16_t* htonmm(MusicMeta *mm, MMHints *hints)
     uint16_t offset_idx = 0;
 
     // header section
-    uint16_t h1 = hints->pkt_type | (hints->pkt_op << 4) | (hints->pkt_status << 8);                     /* type == 0 && status == 0 */
+    uint16_t h1 = hints->pkt_type | (hints->pkt_op << 4) | (hints->pkt_status << 8);
     uint16_t h2 = hints->pkt_filter | (hints->pkt_numres << 8);
     pkt_size += 2;
 
@@ -213,9 +213,6 @@ uint16_t** htonmd(FILE *md, MMHints *hints, int *frags)
     int temp_size = total_size;
     num_frags = (total_size / (UDP_SIZE - 5)) + ((total_size % (UDP_SIZE - 5)) != 0);
 
-    // printf("Music Total size %d\n", total_size);
-    // printf("Music Fragments %d\n", num_frags);
-
     // Allocates memory for all fragments (with headers included)
     pkt = (uint16_t **) calloc(num_frags, sizeof(uint16_t *));
     for (int i = 0; i < num_frags; i++) {
@@ -255,32 +252,21 @@ uint16_t** htonmd(FILE *md, MMHints *hints, int *frags)
         //     test[(pkt[i][3] * (UDP_SIZE - 5)) + j] = pkt[i][j + 5];
         // }
 
+        // FIX-ME: Does not order pkts
         for (int j = 0; j < pkt[i][0] - 5; j++) {
             test[test_idx] = pkt[i][j + 5];
             test_idx++;
         }
     }
 
-    // for (int i = 0; i < temp_size; i++) {
-    //     test[i] = buff[i];
-    // }
-
     int diffs = 0;
     for (int i = 0; i < temp_size; i++) {
         if (test[i] != buff[i]) {
-            // printf("broke at %d\n", i);
             diffs++;
-            // break;
         }
     }
 
     printf("server: found %d diffs in %d bytes!\n", diffs, 2 * temp_size);
-
-    FILE *fptr;
-
-	fptr = fopen("sanity.mp3", "wb");
-	fwrite(test, sizeof(uint16_t), temp_size, fptr);
-	fclose(fptr);
 
     // Rewrites pkt with network byte order
     for (int i = 0; i < num_frags; i++) {

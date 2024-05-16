@@ -377,7 +377,7 @@ int main(int argc, char *argv[])
 
 		// UDP Service Loop
 		if (FD_ISSET(downloadfd, &rset)) {
-			// char music_name[128];
+			char music_name[128];
 			uint16_t buff[1000];
 			MusicMeta *mm;
     		MMHints hints;
@@ -391,23 +391,13 @@ int main(int argc, char *argv[])
 			mm = ntohmm(buff, &hints);
 
 			if (hints.pkt_op == MUSIC_GET) {
-				printf("server: sending file for music %d\n", mm->id);
+				sprintf(music_name, "songs/%d.mp3", mm->id);
+				// FIX-ME: Validate ID
+				printf("server: sending file for music %s\n", music_name);
 				// get_music_name(music_name, db, mm->id);
-				send_song("songs/test.mp3", downloadfd, (struct sockaddr *) &their_addr, &sin_size);
-
-				// char *filename = download_music(db, mm->id);
-				// if(strcmp(filename, "")){
-				// 	hints.pkt_status = MUSIC_ERR;
-				// }
-				// else{
-				// 	hints.pkt_status = MUSIC_OK;
-				// }	
-				// hints.pkt_numres = 0;
-				// send_song(filename, downloadfd, &their_addr, sin_size);
-				
+				send_song(music_name, downloadfd, (struct sockaddr *) &their_addr, &sin_size);
 			} else {
 				perror("server: operation is not supported via UDP\n");
-
 			}
 		}
 	}
