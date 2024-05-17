@@ -300,16 +300,16 @@ uint16_t * talk_udp(MusicMeta *mm, MMHints *hints, int fd, struct addrinfo *p, i
 		res[i] = (uint16_t *) calloc(UDP_SIZE, sizeof(uint16_t));
 	}
 
-	// Sets timeout
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 3000000;
-
 	// Receives music data
 	count = 0;
 	total = 0;
 	FD_ZERO(&rset);
 	while (1) {
 		FD_SET(fd, &rset);
+
+		// Sets timeout
+		timeout.tv_sec = 5;
+		timeout.tv_usec = 0;
 
 		// blocks until rcvs pkt or times out
 		ret = select(fd + 1, &rset, NULL, NULL, &timeout);
