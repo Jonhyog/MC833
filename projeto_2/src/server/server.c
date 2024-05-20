@@ -267,13 +267,13 @@ void send_song(char *fname, int sockfd, struct sockaddr *to, socklen_t *tolen)
 	printf("server: sending %d fragments to client\n", frags);
 	// sends all fragments
 	for (int i = 0; i < frags; i++) {
-		printf("\rserver: sending fragment %d", i);
-		fflush(stdout);
+		// printf("\rserver: sending fragment %d", i);
+		// fflush(stdout);
 		sendto(sockfd, pkts[i], UDP_SIZE * 2, 0, to, *tolen);
 		usleep(100);
 
 	}
-	printf("\n");
+	printf("server: sent all fragments!\n");
 }
 
 int main(int argc, char *argv[])

@@ -3,7 +3,7 @@ WARN=-Wall -Werror
 CCFLAGS=$(WARN)
 INCLUDE_DIR=src/util/*
 
-all: client server
+all: utils client server
 
 server: src/server/server.c
 	$(CC) src/server/server.c -c -o bin/server/server.o -Isrc/util/parser/ -Isrc/util/music/ -Isrc/util/codec/ $(CCFLAGS)

@@ -210,16 +210,14 @@ uint16_t** htonmd(FILE *md, MMHints *hints, int *frags)
     // Reads file and calculates num of
     // fragments to send over udp
     total_size = read_file(md, buff);
-    int temp_size = total_size;
+    // int temp_size = total_size;
     num_frags = (total_size / (UDP_SIZE - 5)) + ((total_size % (UDP_SIZE - 5)) != 0);
 
     // Allocates memory for all fragments (with headers included)
     pkt = (uint16_t **) calloc(num_frags, sizeof(uint16_t *));
     for (int i = 0; i < num_frags; i++) {
-        // size(pkt[i]) = 
-        //              = (pkt_size + h1 + h2 + h3) + FRAG_SIZE
-        //              = 6 + FRAG_SIZE
-        // We use FRAG_SIZE / 2 because FRAG_SIZE is in bytes and uint16 == 2 bytes
+        // size(pkt[i]) = (pkt_size + h1 + h2 + sizeof(i) + sizeof(num_frags)) + 240
+        //              = 5 + 245 = UDP_SIZE
         pkt[i] = (uint16_t *) calloc(UDP_SIZE, sizeof(uint16_t));
     }
 
@@ -232,7 +230,7 @@ uint16_t** htonmd(FILE *md, MMHints *hints, int *frags)
         pkt[i][3] = i;
         pkt[i][4] = num_frags;
 
-        total_size -= pkt[i][0];
+        total_size -= pkt[i][0] - 5;
 
         // Copies music data to pkt
         for (int j = 0; j < pkt[i][0] - 5; j++) {
@@ -244,29 +242,21 @@ uint16_t** htonmd(FILE *md, MMHints *hints, int *frags)
     printf("server: copied %d uint_16 from %d frags\n", file_idx, num_frags);
 
     // sanity test
-    uint16_t *test = (uint16_t *) calloc(MAX_MUSIC_SIZE, sizeof(uint16_t));
-    int test_idx = 0;
-    for (int i = 0; i < num_frags; i++) {
-        // for (int j = 0; j < pkt[i][0] - 5; j++) {
-        //     // buff[file_idx++] = pkt[i][j + 5];
-        //     test[(pkt[i][3] * (UDP_SIZE - 5)) + j] = pkt[i][j + 5];
-        // }
+    // uint16_t *test = (uint16_t *) calloc(MAX_MUSIC_SIZE, sizeof(uint16_t));
+    // for (int i = 0; i < num_frags; i++) {
+    //     for (int j = 0; j < pkt[i][0] - 5; j++) {
+    //         test[(pkt[i][3] * (UDP_SIZE - 5)) + j] = pkt[i][j + 5];
+    //     }
+    // }
 
-        // FIX-ME: Does not order pkts
-        for (int j = 0; j < pkt[i][0] - 5; j++) {
-            test[test_idx] = pkt[i][j + 5];
-            test_idx++;
-        }
-    }
+    // int diffs = 0;
+    // for (int i = 0; i < temp_size; i++) {
+    //     if (test[i] != buff[i]) {
+    //         diffs++;
+    //     }
+    // }
 
-    int diffs = 0;
-    for (int i = 0; i < temp_size; i++) {
-        if (test[i] != buff[i]) {
-            diffs++;
-        }
-    }
-
-    printf("server: found %d diffs in %d bytes!\n", diffs, 2 * temp_size);
+    // printf("server: found %d diffs in %d bytes!\n", diffs, 2 * temp_size);
 
     // Rewrites pkt with network byte order
     for (int i = 0; i < num_frags; i++) {
@@ -283,7 +273,6 @@ uint16_t* ntohmd(uint16_t** pkt, MMHints *hints, int count)
 {
     uint16_t *buff = (uint16_t *) calloc(MAX_MUSIC_SIZE, sizeof(uint16_t));
     uint16_t num_frags = ntohs(pkt[0][4]);
-    // uint16_t file_idx;
 
     // Rewrites pkt with host byte order
     for (int i = 0; i < num_frags; i++) {
@@ -300,13 +289,9 @@ uint16_t* ntohmd(uint16_t** pkt, MMHints *hints, int count)
     hints->pkt_filter = (pkt[0][2] & 0b0000000011111111);
     hints->pkt_numres = (pkt[0][2] & 0b1111111100000000) >> 8;
 
-    // TODO: Reorder pkts
-
-    // Copies Music Data
-    // file_idx = 0;
+    // Copies music data using frag as idx to avoid reordering
     for (int i = 0; i < count; i++) {
         for (int j = 0; j < pkt[i][0] - 5; j++) {
-            // buff[file_idx++] = pkt[i][j + 5];
             buff[(pkt[i][3] * (UDP_SIZE - 5)) + j] = pkt[i][j + 5];
         }
     }
